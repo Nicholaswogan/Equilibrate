@@ -3,6 +3,43 @@ module chemequi_cea
    use chemequi_const, only: dp
    implicit none
 
+   type :: CEAData
+      
+      ! Run variables
+      integer     :: iter_max
+      integer     :: N_atoms, N_reactants, N_gas, N_cond, N_ions
+      logical     :: verbose, verbose_cond, quick, ions, remove_ions, error
+      character(len=500)   :: err_msg
+
+      ! List of atoms
+      character(len=2), allocatable   :: names_atoms(:)  !(N_atoms)
+      integer, allocatable            :: id_atoms(:)  !(N_atoms)
+
+      ! List of reactants reordered with condensates at the end
+      character(len=15), allocatable  :: names_reactants(:), names_reactants_orig(:)  !(N_reac)
+      integer, allocatable            :: id_reactants(:,:)  !(N_reac,2)
+
+      ! Atomic data for each reactant
+      character(len=2), allocatable   :: reac_atoms_names(:,:)  !(5,N_reac)
+      integer, allocatable            :: reac_atoms_id(:,:)  !(5,N_reac)
+      real(dp), allocatable   :: reac_stoich(:,:)  !(5,N_reac)
+
+      ! Nature of reactant
+      logical, allocatable    :: reac_condensed(:), reac_ion(:)  !(N_reac)
+
+      ! Thermodynamic data arrays
+      integer :: N_coeffs = 10, N_temps = 10
+      integer, allocatable    :: thermo_data_n_coeffs(:,:)  !(N_temps,N_reac)
+      integer, allocatable    :: thermo_data_n_intervs(:)  !(N_reac)
+      real(dp), allocatable   :: thermo_data(:,:,:)  !(N_coeffs,N_temps,N_reac)
+      real(dp), allocatable   :: thermo_data_temps(:,:,:)  !(2,N_temps,N_reac)
+      real(dp), allocatable   :: thermo_data_T_exps(:,:,:)  !(8,N_temps,N_reac)
+      real(dp), allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
+      real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
+      real(dp), allocatable   :: mol_weight(:)  !(N_reac)
+
+   end type
+
    !> Run variables
    integer     :: iter_max
    integer     :: N_atoms, N_reactants, N_gas, N_cond, N_ions
@@ -39,17 +76,11 @@ module chemequi_cea
 contains
 
    !> INITIALIZE ALL DATA
-   subroutine SET_DATA(N_atoms_in, N_reactants_in, atoms_char, reac_char, fpath)
+   subroutine SET_DATA(self, N_atoms_in, N_reactants_in, atoms_char, reac_char, fpath)
+      class(CEAData), intent(inout) :: self
       character, intent(in)   :: atoms_char(N_atoms_in,2), reac_char(N_reactants_in,15)
       integer, intent(in)     :: N_atoms_in, N_reactants_in
       character(len=800), intent(in) :: fpath
-
-      interface
-      subroutine chrarr_to_stringarr(chr, str)
-         character, intent(in)                   :: chr(:,:)         ! row = 1 string
-         character(len=size(chr,2)), intent(out) :: str(size(chr,1))
-      end subroutine
-      end interface
 
       error = .false.
 
@@ -99,7 +130,7 @@ contains
       call da_CH2STR(reac_char, names_reactants_orig)
 
       ! Set all thermodynamic data
-      call da_READ_THERMO(fpath)
+      call da_READ_THERMO(self, fpath)
       if (error) RETURN
 
       ! ATOMS
@@ -116,10 +147,10 @@ contains
       call da_CH2STR(atoms_char, names_atoms(1:N_atoms_in))
       names_atoms(N_atoms) = 'E'
 
-      call da_ATOMS_ID()
+      call da_ATOMS_ID(self)
       if (error) RETURN
 
-      call da_REAC_ATOMS_ID()
+      call da_REAC_ATOMS_ID(self)
 
    end subroutine SET_DATA
 
@@ -140,9 +171,9 @@ contains
 
    !> Sets id_atoms, where the i-th cell corresponds to names_atoms(i) and contains the index of the same atom in names_atoms_save
    !> names_atoms_save(id_atoms(i)) = names_atoms(i)
-   subroutine da_ATOMS_ID()
+   subroutine da_ATOMS_ID(self)
       use chemequi_const, only: N_atoms_save, names_atoms_save
-
+      class(CEAData), intent(inout) :: self
       integer           :: i_atom, i_atom_save
       logical           :: change
       character(len=2)  :: atom_upper, atom_upper_save
@@ -173,9 +204,9 @@ contains
       end do
    end subroutine da_ATOMS_ID
 
-   subroutine da_REAC_ATOMS_ID()
+   subroutine da_REAC_ATOMS_ID(self)
       use chemequi_const, only: N_atoms_save, names_atoms_save
-
+      class(CEAData), intent(inout) :: self
       integer           :: i_reac, i_atom, i_atom_save
       logical           :: change
       character(len=2)  :: atom_upper, atom_upper_save
@@ -210,8 +241,8 @@ contains
    end subroutine da_REAC_ATOMS_ID
 
    !> Read in provided file all thermodynamic data
-   subroutine da_READ_THERMO(fpath)
-
+   subroutine da_READ_THERMO(self, fpath)
+      class(CEAData), intent(inout) :: self
       character(len=800), intent(in) :: fpath
       character(len=80)             :: file_line, file_line_up
       character(len=15)             :: name_reac_up
@@ -274,7 +305,7 @@ contains
       N_cond = N_reactants - N_gas
 
       ! Puts in names_reactants the ordered list of reactants, sets id_reactants as a link between the two
-      call da_REORDER_SPECS()
+      call da_REORDER_SPECS(self)
 
       ! BASED ON THE ~RIGHT DESCRIPTION GIVEN IN GORDON 1996, page 73 AND THE APPEARANCE OF THERMO.INP.
       open(unit=17,file=fpath, action="READ", status="OLD")
@@ -353,8 +384,8 @@ contains
    end subroutine uppercase
 
    !> Puts in names_reactants the ordered list of reactants, sets id_reactants as a link between the two
-   subroutine da_REORDER_SPECS()
-
+   subroutine da_REORDER_SPECS(self)
+      class(CEAData), intent(inout) :: self
       integer  :: i_reac, gas_offset, cond_offset
 
       gas_offset = 1
@@ -377,10 +408,11 @@ contains
    end subroutine da_REORDER_SPECS
 
    !> MAIN SUBROUTINE
-   subroutine EASYCHEM(mode,verbo,N_atoms_in,N_reactants_in,molfracs_atoms, &
+   subroutine EASYCHEM(self,mode,verbo,N_atoms_in,N_reactants_in,molfracs_atoms, &
       molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
 
       !! I/O:
+      class(CEAData), intent(inout) :: self
       character, intent(in)            :: mode
       character(len=2), intent(in)     :: verbo
       real(dp), intent(in)     :: molfracs_atoms(N_atoms_in)
@@ -425,12 +457,12 @@ contains
 
       ! CALCULATION BEGINS
 
-      call ec_COMP_THERMO_QUANTS(temp,N_reactants,C_P_0, H_0, S_0)
+      call ec_COMP_THERMO_QUANTS(self,temp,N_reactants,C_P_0, H_0, S_0)
       gamma2 = 0d0
       temp_use = temp
       gamma_neg_try = 0d0
       do while (gamma2 < 1d0)
-         call ec_COMP_EQU_CHEM(N_atoms_use, N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
+         call ec_COMP_EQU_CHEM(self,N_atoms_use, N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
          molfracs_reactants, massfracs_reactants, &
          temp_use, press, C_P_0, H_0, S_0, &
          nabla_ad, gamma2, MMW, rho, c_pe)
@@ -443,7 +475,7 @@ contains
                call random_number(temp_use)
                temp_use = temp*(1d0 + 0.01d0*temp_use)
                write(*,*) 'temp, temp_use', temp, temp_use
-               call ec_COMP_THERMO_QUANTS(temp_use,N_reactants,C_P_0, H_0, S_0)
+               call ec_COMP_THERMO_QUANTS(self,temp_use,N_reactants,C_P_0, H_0, S_0)
             end if
          end if
       end do
@@ -453,9 +485,10 @@ contains
    end subroutine EASYCHEM
 
    !> Computes the values of C_P_0, H_0 and S_0
-   subroutine ec_COMP_THERMO_QUANTS(temp,N_reac,C_P_0, H_0, S_0)
+   subroutine ec_COMP_THERMO_QUANTS(self,temp,N_reac,C_P_0, H_0, S_0)
       use chemequi_const, only: R
       !! I/O
+      class(CEAData), intent(inout) :: self
       real(dp), intent(in)  :: temp
       integer, intent(in)           :: N_reac
       real(dp), intent(out) :: C_P_0(N_reac), H_0(N_reac), &
@@ -507,12 +540,13 @@ contains
    end subroutine ec_COMP_THERMO_QUANTS
 
    !> Computes the specie abundances (molar and mass)
-   recursive subroutine ec_COMP_EQU_CHEM(N_atoms_use, N_reac, molfracs_atoms, &
+   recursive subroutine ec_COMP_EQU_CHEM(self, N_atoms_use, N_reac, molfracs_atoms, &
       molfracs_reactants, massfracs_reactants, &
       temp, press, C_P_0, H_0, S_0, nabla_ad, gamma2, MMW, rho, c_pe)
       use chemequi_const, only: amu, kB, masses_atoms_save
 
       !! I/O:
+      class(CEAData), intent(inout) :: self
       integer, intent(in)              :: N_atoms_use, N_reac
       real(dp), intent(in)     :: molfracs_atoms(N_atoms_use)
       real(dp), intent(inout)  :: molfracs_reactants(N_reac), massfracs_reactants(N_reac)
@@ -539,7 +573,7 @@ contains
 
       converged = .FALSE.
       slowed = .FALSE.
-      call ec_INIT_ALL_VALS(N_atoms_use,N_reactants,n,n_spec,pi_atom)
+      call ec_INIT_ALL_VALS(self,N_atoms_use,N_reactants,n,n_spec,pi_atom)
 
       iter_max = 50000 + N_reactants/2
       current_solids_number = 0
@@ -552,15 +586,15 @@ contains
       DO i_iter = 1, iter_max
 
          ! IF (quick) THEN
-         call ec_PREP_MATRIX_SHORT(N_atoms_use,N_reactants, molfracs_atoms,N_gas,press,temp,&
+         call ec_PREP_MATRIX_SHORT(self,N_atoms_use,N_reactants, molfracs_atoms,N_gas,press,temp,&
          H_0,S_0,n,n_spec,matrix(1:N_atoms_use+1,1:N_atoms_use+1),vector(1:N_atoms_use+1),&
          (/1,1,1,1,1/),5, mu_gas,a_gas)
-         call ec_INVERT_MATRIX_SHORT(N_atoms_use+1, &
+         call ec_INVERT_MATRIX_SHORT(self,N_atoms_use+1, &
          matrix(1:N_atoms_use+1,1:N_atoms_use+1),vector(1:N_atoms_use+1), &
          solution_vector(1:N_atoms_use+1))
          if (error) RETURN
 
-         call ec_UPDATE_ABUNDS_SHORT(N_atoms_use,N_reactants,N_gas,&
+         call ec_UPDATE_ABUNDS_SHORT(self,N_atoms_use,N_reactants,N_gas,&
          solution_vector(1:N_atoms_use+1), n_spec,pi_atom,n,converged,&
          (/1,1,1,1,1/),5,mu_gas,a_gas,temp,molfracs_atoms,n_spec_old)
          ! ELSE
@@ -601,7 +635,7 @@ contains
       remove_cond = .FALSE.
 
       IF (N_gas .EQ. N_reactants) THEN
-         call ec_COMP_ADIABATIC_GRAD(N_atoms_use, N_reactants, N_gas,  n_spec, &
+         call ec_COMP_ADIABATIC_GRAD(self,N_atoms_use, N_reactants, N_gas,  n_spec, &
          n, H_0, C_P_0, (/ 1,1,1,1,1 /), 5, temp, nabla_ad, gamma2, c_pe)
          if (error) RETURN
       END IF
@@ -616,7 +650,7 @@ contains
 
          DO WHILE (inc_next /= -1)
 
-            call ec_INCLUDE_WHICH_SOLID(N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
+            call ec_INCLUDE_WHICH_SOLID(self,N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
             n_spec,solid_inclu,neg_cond,dgdnj,remove_cond,inc_next)
 
             if (inc_next/=-1) then
@@ -642,7 +676,7 @@ contains
                   current_solids_number = current_solids_number + 1
                   solid_indices(current_solids_number) = inc_next
                   solid_inclu(inc_next-N_gas) = .TRUE.
-                  call ec_INIT_COND_VALS(N_atoms_use, N_reactants, molfracs_atoms, inc_next, n_spec)
+                  call ec_INIT_COND_VALS(self,N_atoms_use, N_reactants, molfracs_atoms, inc_next, n_spec)
                   if (verbose_cond) then
                      print *, '+   ', names_reactants(inc_next), dgdnj(inc_next-N_gas), n_spec(inc_next)
                   end if
@@ -652,35 +686,35 @@ contains
                DO i_iter = 1, iter_max
 
                   IF (quick) THEN
-                     call ec_PREP_MATRIX_SHORT(N_atoms_use, N_reactants, molfracs_atoms,N_spec_eff, &
+                     call ec_PREP_MATRIX_SHORT(self,N_atoms_use, N_reactants, molfracs_atoms,N_spec_eff, &
                      press, temp, H_0, S_0, n, n_spec, &
                      matrix(1:N_atoms_use+1+N_spec_eff-N_gas,1:N_atoms_use+1+N_spec_eff-N_gas), &
                      vector(1:N_atoms_use+1+N_spec_eff-N_gas), solid_indices, &
                      N_spec_eff-N_gas, mu_gas, a_gas)
-                     call ec_INVERT_MATRIX_SHORT(N_atoms_use+1+N_spec_eff-N_gas, &
+                     call ec_INVERT_MATRIX_SHORT(self,N_atoms_use+1+N_spec_eff-N_gas, &
                      matrix(1:N_atoms_use+1+N_spec_eff-N_gas,1:N_atoms_use+1+N_spec_eff-N_gas), &
                      vector(1:N_atoms_use+1+N_spec_eff-N_gas), &
                      solution_vector(1:N_atoms_use+1+N_spec_eff-N_gas))
                      if (error) RETURN
 
-                     call ec_UPDATE_ABUNDS_SHORT(N_atoms_use,N_reactants,N_spec_eff,&
+                     call ec_UPDATE_ABUNDS_SHORT(self,N_atoms_use,N_reactants,N_spec_eff,&
                      solution_vector(1:N_atoms_use+1+N_spec_eff-N_gas), &
                      n_spec,pi_atom,n,converged,&
                      solid_indices,N_spec_eff-N_gas,mu_gas,a_gas,temp,molfracs_atoms, &
                      n_spec_old)
                   ELSE
-                     call ec_PREP_MATRIX_LONG(N_atoms_use,N_reactants,molfracs_atoms,N_spec_eff,&
+                     call ec_PREP_MATRIX_LONG(self,N_atoms_use,N_reactants,molfracs_atoms,N_spec_eff,&
                      press,temp,H_0,S_0,n,n_spec,&
                      matrix(1:N_spec_eff+N_atoms_use+1,1:N_spec_eff+N_atoms_use+1),&
                      vector(1:N_spec_eff+N_atoms_use+1),&
                      solid_indices,N_spec_eff-N_gas)
-                     call ec_INVERT_MATRIX_LONG(N_atoms_use+N_spec_eff+1, &
+                     call ec_INVERT_MATRIX_LONG(self,N_atoms_use+N_spec_eff+1, &
                      matrix(1:N_spec_eff+N_atoms_use+1,1:N_spec_eff+N_atoms_use+1),&
                      vector(1:N_spec_eff+N_atoms_use+1), &
                      solution_vector(1:N_spec_eff+N_atoms_use+1))
                      if (error) RETURN
 
-                     call ec_UPDATE_ABUNDS_LONG(N_atoms_use, N_reac, N_spec_eff, &
+                     call ec_UPDATE_ABUNDS_LONG(self,N_atoms_use, N_reac, N_spec_eff, &
                      solution_vector(1:N_spec_eff+N_atoms_use+1), &
                      n_spec, pi_atom, n, converged, &
                      solid_indices, N_spec_eff-N_gas, molfracs_atoms, n_spec_old)
@@ -717,7 +751,7 @@ contains
                      print *
                      print *, 'SLOW ! Press, Temp', press, temp
                      print *
-                     call ec_COMP_EQU_CHEM(N_atoms_use, N_reactants, molfracs_atoms, &
+                     call ec_COMP_EQU_CHEM(self,N_atoms_use, N_reactants, molfracs_atoms, &
                      molfracs_reactants, massfracs_reactants, &
                      temp, press, C_P_0, H_0, S_0, &
                      nabla_ad,gamma2,MMW,rho,c_pe)
@@ -741,7 +775,7 @@ contains
 
          ! Calc. nabla_ad
          IF (.NOT. slowed) THEN
-            call ec_COMP_ADIABATIC_GRAD(N_atoms_use, N_reactants, N_spec_eff, n_spec, &
+            call ec_COMP_ADIABATIC_GRAD(self,N_atoms_use, N_reactants, N_spec_eff, n_spec, &
             n,H_0,C_P_0,solid_indices,N_spec_eff-N_gas,temp, nabla_ad,gamma2,c_pe)
             if (error) RETURN
          END IF
@@ -802,8 +836,9 @@ contains
    end subroutine ec_COMP_EQU_CHEM
 
    !> Initialize all abundances with uniform abundances for gas and 0 for condensates
-   subroutine ec_INIT_ALL_VALS(N_atoms_use,N_reac,n,n_spec,pi_atom)
+   subroutine ec_INIT_ALL_VALS(self,N_atoms_use,N_reac,n,n_spec,pi_atom)
       !! I/O:
+      class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use, N_reac
       real(dp), intent(out) :: n ! Moles of gas particles per total mass of mixture in kg
       real(dp), intent(out) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
@@ -828,10 +863,11 @@ contains
    end subroutine ec_INIT_ALL_VALS
 
    !> Selects which solid to include next
-   subroutine ec_INCLUDE_WHICH_SOLID(N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
+   subroutine ec_INCLUDE_WHICH_SOLID(self,N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
       n_spec,solid_inclu,neg_cond,dgdnj,remove_cond,inc_next)
       use chemequi_const, only: mol, R
       !! I/O
+      class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use, N_reac
       real(dp), intent(in)  :: pi_atom(N_atoms_use)
       real(dp), intent(in)  :: H_0(N_reac), S_0(N_reac), temp
@@ -912,8 +948,8 @@ contains
    end subroutine ec_INCLUDE_WHICH_SOLID
 
    !> Initialize one condensate abundance, as if the most molecules condensed
-   subroutine ec_INIT_COND_VALS(N_atoms_use, N_reac, molfracs_atoms, i_cond, n_spec)
-
+   subroutine ec_INIT_COND_VALS(self,N_atoms_use, N_reac, molfracs_atoms, i_cond, n_spec)
+      class(CEAData), intent(inout) :: self
       integer, intent(in)              :: N_atoms_use, i_cond, N_reac
       real(dp), intent(in)     :: molfracs_atoms(N_atoms_use)
       real(dp), intent(inout)  :: n_spec(N_reac)
@@ -944,10 +980,11 @@ contains
    end subroutine ec_INIT_COND_VALS
 
    !> Build the small matrix
-   subroutine ec_PREP_MATRIX_SHORT(N_atoms_use, N_reac, molfracs_atoms, N_species, press, temp, &
+   subroutine ec_PREP_MATRIX_SHORT(self,N_atoms_use, N_reac, molfracs_atoms, N_species, press, temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids, mu_gas, a_gas)
       use chemequi_const, only: mol, R
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
       real(dp), intent(in) :: molfracs_atoms(N_atoms_use), press, temp
@@ -978,7 +1015,7 @@ contains
       !    b_0_norm = b_0_norm + mass_atom*molfracs_atoms(i_atom)
       ! END DO
       ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
 
       ! Set up a_ij
       a = 0d0
@@ -1155,10 +1192,11 @@ contains
 
 
    !> Return the result of one step of computation with small matrix(problem: AX=B)
-   subroutine ec_UPDATE_ABUNDS_SHORT(N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
+   subroutine ec_UPDATE_ABUNDS_SHORT(self,N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,mu_gas,a_gas,temp,molfracs_atoms,n_spec_old)
       use chemequi_const, only: mol, R
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
       real(dp), intent(in) :: solution_vector(N_atoms_use+1+(N_species-N_gas))
@@ -1285,7 +1323,7 @@ contains
       !    b_0_norm = b_0_norm + mass_atom*molfracs_atoms(i_atom)
       ! END DO
       ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
 
       ! Set up a_ij
       a = 0d0
@@ -1409,10 +1447,11 @@ contains
    end subroutine ec_UPDATE_ABUNDS_SHORT
 
    !> Build the big matrix
-   subroutine ec_PREP_MATRIX_LONG(N_atoms_use, N_reac, molfracs_atoms, N_species,press,temp, &
+   subroutine ec_PREP_MATRIX_LONG(self,N_atoms_use, N_reac, molfracs_atoms, N_species,press,temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids)
       use chemequi_const, only: mol, R
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
       real(dp), intent(in) :: molfracs_atoms(N_atoms_use), press, temp
@@ -1441,7 +1480,7 @@ contains
       !    end if
       ! END DO
       ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
 
       ! Set up a_ij
       a = 0d0
@@ -1594,10 +1633,11 @@ contains
    end subroutine ec_PREP_MATRIX_LONG
 
    !> Return the result of one step of computation with big matrix(problem: AX=B)
-   subroutine ec_UPDATE_ABUNDS_LONG(N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
+   subroutine ec_UPDATE_ABUNDS_LONG(self,N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,molfracs_atoms,n_spec_old)
       use chemequi_const, only: mol
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER , intent(in)         :: solid_indices(N_solids)
       real(dp), intent(in) :: solution_vector(N_species+N_atoms_use+1)
@@ -1709,7 +1749,7 @@ contains
       !    b_0_norm = b_0_norm + mass_atom*molfracs_atoms(i_atom)
       ! END DO
       ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
 
       ! Set up a_ij
       a = 0d0
@@ -1837,11 +1877,12 @@ contains
    end subroutine ec_UPDATE_ABUNDS_LONG
 
    !> Computes the adiabatic gradient
-   subroutine ec_COMP_ADIABATIC_GRAD(N_atoms_use,N_reac,N_spec_eff,n_spec, &
+   subroutine ec_COMP_ADIABATIC_GRAD(self,N_atoms_use,N_reac,N_spec_eff,n_spec, &
    n,H_0,C_P_0,solid_indices,N_solids,temp,nabla_ad,gamma2,c_pe)
       use chemequi_const, only: mol, R
 
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_spec_eff, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
       real(dp), intent(in) :: temp
@@ -1957,7 +1998,7 @@ contains
       END DO
 
       ! Solve the system
-      call ec_INVERT_MATRIX_SHORT(N_atoms_use+1+N_spec_eff-N_gas,matrix,vector,solution_vector)
+      call ec_INVERT_MATRIX_SHORT(self,N_atoms_use+1+N_spec_eff-N_gas,matrix,vector,solution_vector)
       if (error) RETURN
 
       ! Calculate c_pe, following Eq. 2.59
@@ -1985,8 +2026,9 @@ contains
 
    end subroutine ec_COMP_ADIABATIC_GRAD
 
-   subroutine ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+   subroutine ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
       use chemequi_const, only: masses_atoms_save
+      class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use
       real(dp), intent(in)  :: molfracs_atoms(N_atoms_use)
       real(dp), intent(out) :: b_0_norm, b_0(N_atoms_use)
@@ -2086,10 +2128,11 @@ contains
    end subroutine INIT_RAND_SEED
 
    !> Invert the small matrix
-   subroutine ec_INVERT_MATRIX_SHORT(lens,matrix,vector,solution_vector)
+   subroutine ec_INVERT_MATRIX_SHORT(self, lens,matrix,vector,solution_vector)
       ! use data_block, only: error
       ! implicit none
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)           :: lens
       real(dp), intent(inout)  :: matrix(lens,lens)
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
@@ -2102,17 +2145,18 @@ contains
 
       solution_vector = vector
 
-      call ec_LUDCMP(matrix,index,indic)
+      call ec_LUDCMP(self,matrix,index,indic)
       if (error) RETURN
-      call ec_LUBKSB(matrix,index,solution_vector)
+      call ec_LUBKSB(self,matrix,index,solution_vector)
 
    end subroutine ec_INVERT_MATRIX_SHORT
 
    !> Invert the big matrix
-   subroutine ec_INVERT_MATRIX_LONG(lens,matrix,vector,solution_vector)
+   subroutine ec_INVERT_MATRIX_LONG(self,lens,matrix,vector,solution_vector)
       ! use data_block, only: N_gas, N_ions, remove_ions, reac_ion, error
       ! implicit none
       !! I/O:
+      class(CEAData), intent(inout) :: self
       INTEGER, intent(in)           :: lens
       real(dp), intent(inout)  :: matrix(lens,lens)
       real(dp), intent(in)  :: vector(lens)
@@ -2157,9 +2201,9 @@ contains
          END DO
          solution_vector_nions = vector_nions
 
-         call ec_LUDCMP(matrix_nions,index_nions,indic)
+         call ec_LUDCMP(self,matrix_nions,index_nions,indic)
          if (error) RETURN
-         call ec_LUBKSB(matrix_nions,index_nions,solution_vector_nions)
+         call ec_LUBKSB(self,matrix_nions,index_nions,solution_vector_nions)
          if (error) RETURN
 
          corrf_i = 0
@@ -2173,18 +2217,19 @@ contains
             solution_vector(i_mat) = solution_vector_nions(i_mat-corrf_i)
          END DO
       ELSE
-         call ec_LUDCMP(matrix,index,indic)
+         call ec_LUDCMP(self,matrix,index,indic)
          if (error) RETURN
-         call ec_LUBKSB(matrix,index,solution_vector)
+         call ec_LUBKSB(self,matrix,index,solution_vector)
          if (error) RETURN
       END IF
 
    end subroutine ec_INVERT_MATRIX_LONG
 
    !> LU decomposition, from numerical recipes
-   subroutine ec_LUDCMP(a,indx,d)
+   subroutine ec_LUDCMP(self,a,indx,d)
       ! use data_block, only: error, err_msg
       ! implicit none
+      class(CEAData), intent(inout) :: self
       real(dp), intent(inout)  :: a(:,:)
       integer, intent(out)             :: indx(:)
       real(dp), intent(out)    :: d
@@ -2193,7 +2238,7 @@ contains
       real(dp), parameter      :: TINY = 1.0e-20
       integer                          :: j, n, imax
 
-      n = lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUDCMP')
+      n = lu_asserteq(self,size(a,1),size(a,2),size(indx),'ec_LUDCMP')
       if (error) RETURN
 
       d = 1.0
@@ -2207,7 +2252,7 @@ contains
       do j = 1,n
          imax = (j-1)+maxloc(vv(j:n)*abs(a(j:n,j)), dim=1)
          if (j /= imax) then
-            call lu_swap(n,a(imax,:),a(j,:))
+            call lu_swap(self,n,a(imax,:),a(j,:))
             d = -d
             vv(imax) = vv(j)
          end if
@@ -2221,16 +2266,17 @@ contains
    END SUBROUTINE ec_LUDCMP
 
    !> LU back substitution
-   SUBROUTINE ec_LUBKSB(a,indx,b)
+   SUBROUTINE ec_LUBKSB(self,a,indx,b)
       ! use data_block, only: error
       ! implicit none
+      class(CEAData), intent(inout) :: self
       real(dp), intent(in) :: a(:,:)
       integer, intent(in) :: indx(:)
       real(dp), intent(inout) :: b(:)
       integer :: i,n,ii,ll
       real(dp) :: summ
 
-      n=lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUBKSB')
+      n=lu_asserteq(self,size(a,1),size(a,2),size(indx),'ec_LUBKSB')
       if (error) RETURN
 
       ii=0
@@ -2250,8 +2296,8 @@ contains
       end do
    END SUBROUTINE ec_LUBKSB
 
-   subroutine lu_swap(len,arr1,arr2)
-      implicit none
+   subroutine lu_swap(self,len,arr1,arr2)
+      class(CEAData), intent(inout) :: self
       integer, intent(in)              :: len
       real(dp), intent(inout)  :: arr1(len), arr2(len)
       real(dp)                 :: tamp(len)
@@ -2261,9 +2307,10 @@ contains
       arr2 = tamp
    end subroutine lu_swap
 
-   function lu_asserteq(n1,n2,n3,label) result(m)
+   function lu_asserteq(self,n1,n2,n3,label) result(m)
       ! use data_block, only: error, err_msg
       ! implicit none
+      class(CEAData), intent(inout) :: self
       integer, intent(in)        :: n1, n2, n3
       character(len=9), intent(in)   :: label
       integer                    :: m
