@@ -9,12 +9,6 @@ module chemequi_cea
    logical     :: verbose, verbose_cond, quick, ions, remove_ions, error
    character(len=500)   :: err_msg
 
-   !> Constants
-   real(dp), parameter :: R = 8.3144598d0
-   real(dp), parameter :: amu = 1.660538921d-24
-   real(dp), parameter :: kB = 1.3806488d-16
-   real(dp), parameter :: mol = 6.02214129d23
-
    !> List of atoms
    character(len=2), allocatable   :: names_atoms(:)  !(N_atoms)
    integer, allocatable            :: id_atoms(:)  !(N_atoms)
@@ -42,30 +36,7 @@ module chemequi_cea
    real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
    real(dp), allocatable   :: mol_weight(:)  !(N_reac)
 
-   !> Atoms & masses, from http://www.science.co.il/PTelements.asp
-   integer, parameter      :: N_atoms_save = 104
-   character*2, parameter  :: names_atoms_save(N_atoms_save) = &
-   (/ 'E ','H ','He','Li','Be','B ','C ','N ','O ','F ','Ne','Na', &
-   'Mg','Al','Si','P ','S ','Cl','Ar','K ','Ca','Sc','Ti','V ','Cr','Mn', &
-   'Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr', &
-   'Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb', &
-   'Te','I ','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd', &
-   'Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W ','Re','Os','Ir', &
-   'Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th', &
-   'Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr' /)
-   real(dp), parameter  :: masses_atoms_save(N_atoms_save) = &
-   amu*(/ 0.000548579909d0, 1.0079d0,4.0026d0,6.941d0,9.0122d0,10.811d0,12.0107d0,14.0067d0 &
-   ,15.9994d0,18.9984d0,20.1797d0,22.9897d0,24.305d0,26.9815d0,28.0855d0,30.9738d0,32.065d0 &
-   ,35.453d0,39.948d0,39.0983d0,40.078d0,44.9559d0,47.867d0,50.9415d0,51.9961d0,54.938d0,55.845d0 &
-   ,58.9332d0,58.6934d0,63.546d0,65.39d0,69.723d0,72.64d0,74.9216d0,78.96d0,79.904d0,83.8d0,85.4678d0 &
-   ,87.62d0,88.9059d0,91.224d0,92.9064d0,95.94d0,98d0,101.07d0,102.9055d0,106.42d0,107.8682d0 &
-   ,112.411d0,114.818d0,118.71d0,121.76d0,127.6d0,126.9045d0,131.293d0,132.9055d0,137.327d0,138.9055d0 &
-   ,140.116d0,140.9077d0,144.24d0,145d0,150.36d0,151.964d0,157.25d0,158.9253d0,162.5d0,164.9303d0 &
-   ,167.259d0,168.9342d0,173.04d0,174.967d0,178.49d0,180.9479d0,183.84d0,186.207d0,190.23d0,192.217d0 &
-   ,195.078d0,196.9665d0,200.59d0,204.3833d0,207.2d0,208.9804d0,209d0,210d0,222d0,223d0,226d0,227d0,232.0381d0 &
-   ,231.0359d0,238.0289d0,237d0,244d0,243d0,247d0,247d0,251d0,252d0,257d0,258d0,259d0,262d0/)
-
-   contains
+contains
 
    !> INITIALIZE ALL DATA
    subroutine SET_DATA(N_atoms_in, N_reactants_in, atoms_char, reac_char, fpath)
@@ -170,6 +141,7 @@ module chemequi_cea
    !> Sets id_atoms, where the i-th cell corresponds to names_atoms(i) and contains the index of the same atom in names_atoms_save
    !> names_atoms_save(id_atoms(i)) = names_atoms(i)
    subroutine da_ATOMS_ID()
+      use chemequi_const, only: N_atoms_save, names_atoms_save
 
       integer           :: i_atom, i_atom_save
       logical           :: change
@@ -202,6 +174,7 @@ module chemequi_cea
    end subroutine da_ATOMS_ID
 
    subroutine da_REAC_ATOMS_ID()
+      use chemequi_const, only: N_atoms_save, names_atoms_save
 
       integer           :: i_reac, i_atom, i_atom_save
       logical           :: change
@@ -481,6 +454,7 @@ module chemequi_cea
 
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(temp,N_reac,C_P_0, H_0, S_0)
+      use chemequi_const, only: R
       !! I/O
       real(dp), intent(in)  :: temp
       integer, intent(in)           :: N_reac
@@ -536,6 +510,7 @@ module chemequi_cea
    recursive subroutine ec_COMP_EQU_CHEM(N_atoms_use, N_reac, molfracs_atoms, &
       molfracs_reactants, massfracs_reactants, &
       temp, press, C_P_0, H_0, S_0, nabla_ad, gamma2, MMW, rho, c_pe)
+      use chemequi_const, only: amu, kB, masses_atoms_save
 
       !! I/O:
       integer, intent(in)              :: N_atoms_use, N_reac
@@ -855,6 +830,7 @@ module chemequi_cea
    !> Selects which solid to include next
    subroutine ec_INCLUDE_WHICH_SOLID(N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
       n_spec,solid_inclu,neg_cond,dgdnj,remove_cond,inc_next)
+      use chemequi_const, only: mol, R
       !! I/O
       integer, intent(in)           :: N_atoms_use, N_reac
       real(dp), intent(in)  :: pi_atom(N_atoms_use)
@@ -970,6 +946,7 @@ module chemequi_cea
    !> Build the small matrix
    subroutine ec_PREP_MATRIX_SHORT(N_atoms_use, N_reac, molfracs_atoms, N_species, press, temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids, mu_gas, a_gas)
+      use chemequi_const, only: mol, R
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
@@ -1180,7 +1157,7 @@ module chemequi_cea
    !> Return the result of one step of computation with small matrix(problem: AX=B)
    subroutine ec_UPDATE_ABUNDS_SHORT(N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,mu_gas,a_gas,temp,molfracs_atoms,n_spec_old)
-
+      use chemequi_const, only: mol, R
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
@@ -1434,7 +1411,7 @@ module chemequi_cea
    !> Build the big matrix
    subroutine ec_PREP_MATRIX_LONG(N_atoms_use, N_reac, molfracs_atoms, N_species,press,temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids)
-
+      use chemequi_const, only: mol, R
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
@@ -1619,7 +1596,7 @@ module chemequi_cea
    !> Return the result of one step of computation with big matrix(problem: AX=B)
    subroutine ec_UPDATE_ABUNDS_LONG(N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,molfracs_atoms,n_spec_old)
-
+      use chemequi_const, only: mol
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER , intent(in)         :: solid_indices(N_solids)
@@ -1862,6 +1839,7 @@ module chemequi_cea
    !> Computes the adiabatic gradient
    subroutine ec_COMP_ADIABATIC_GRAD(N_atoms_use,N_reac,N_spec_eff,n_spec, &
    n,H_0,C_P_0,solid_indices,N_solids,temp,nabla_ad,gamma2,c_pe)
+      use chemequi_const, only: mol, R
 
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_spec_eff, N_solids
@@ -2008,6 +1986,7 @@ module chemequi_cea
    end subroutine ec_COMP_ADIABATIC_GRAD
 
    subroutine ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      use chemequi_const, only: masses_atoms_save
       integer, intent(in)           :: N_atoms_use
       real(dp), intent(in)  :: molfracs_atoms(N_atoms_use)
       real(dp), intent(out) :: b_0_norm, b_0(N_atoms_use)
