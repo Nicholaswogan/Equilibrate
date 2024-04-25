@@ -1,10 +1,7 @@
 
 module chemequi_cea
+   use chemequi_const, only: dp
    implicit none
-   ! private
-
-   ! public :: SET_DATA
-   ! public :: EASYCHEM
 
    !> Run variables
    integer     :: iter_max
@@ -13,10 +10,10 @@ module chemequi_cea
    character(len=500)   :: err_msg
 
    !> Constants
-   double precision, parameter :: R = 8.3144598d0
-   double precision, parameter :: amu = 1.660538921d-24
-   double precision, parameter :: kB = 1.3806488d-16
-   double precision, parameter :: mol = 6.02214129d23
+   real(dp), parameter :: R = 8.3144598d0
+   real(dp), parameter :: amu = 1.660538921d-24
+   real(dp), parameter :: kB = 1.3806488d-16
+   real(dp), parameter :: mol = 6.02214129d23
 
    !> List of atoms
    character(len=2), allocatable   :: names_atoms(:)  !(N_atoms)
@@ -29,7 +26,7 @@ module chemequi_cea
    !> Atomic data for each reactant
    character(len=2), allocatable   :: reac_atoms_names(:,:)  !(5,N_reac)
    integer, allocatable            :: reac_atoms_id(:,:)  !(5,N_reac)
-   double precision, allocatable   :: reac_stoich(:,:)  !(5,N_reac)
+   real(dp), allocatable   :: reac_stoich(:,:)  !(5,N_reac)
 
    !> Nature of reactant
    logical, allocatable    :: reac_condensed(:), reac_ion(:)  !(N_reac)
@@ -38,12 +35,12 @@ module chemequi_cea
    integer, parameter      :: N_coeffs = 10, N_temps = 10
    integer, allocatable    :: thermo_data_n_coeffs(:,:)  !(N_temps,N_reac)
    integer, allocatable    :: thermo_data_n_intervs(:)  !(N_reac)
-   double precision, allocatable   :: thermo_data(:,:,:)  !(N_coeffs,N_temps,N_reac)
-   double precision, allocatable   :: thermo_data_temps(:,:,:)  !(2,N_temps,N_reac)
-   double precision, allocatable   :: thermo_data_T_exps(:,:,:)  !(8,N_temps,N_reac)
-   double precision, allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
-   double precision, allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
-   double precision, allocatable   :: mol_weight(:)  !(N_reac)
+   real(dp), allocatable   :: thermo_data(:,:,:)  !(N_coeffs,N_temps,N_reac)
+   real(dp), allocatable   :: thermo_data_temps(:,:,:)  !(2,N_temps,N_reac)
+   real(dp), allocatable   :: thermo_data_T_exps(:,:,:)  !(8,N_temps,N_reac)
+   real(dp), allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
+   real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
+   real(dp), allocatable   :: mol_weight(:)  !(N_reac)
 
    !> Atoms & masses, from http://www.science.co.il/PTelements.asp
    integer, parameter      :: N_atoms_save = 104
@@ -56,7 +53,7 @@ module chemequi_cea
    'Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W ','Re','Os','Ir', &
    'Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th', &
    'Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr' /)
-   double precision, parameter  :: masses_atoms_save(N_atoms_save) = &
+   real(dp), parameter  :: masses_atoms_save(N_atoms_save) = &
    amu*(/ 0.000548579909d0, 1.0079d0,4.0026d0,6.941d0,9.0122d0,10.811d0,12.0107d0,14.0067d0 &
    ,15.9994d0,18.9984d0,20.1797d0,22.9897d0,24.305d0,26.9815d0,28.0855d0,30.9738d0,32.065d0 &
    ,35.453d0,39.948d0,39.0983d0,40.078d0,44.9559d0,47.867d0,50.9415d0,51.9961d0,54.938d0,55.845d0 &
@@ -406,8 +403,6 @@ module chemequi_cea
       end do
    end subroutine da_REORDER_SPECS
 
-
-
    !> MAIN SUBROUTINE
    subroutine EASYCHEM(mode,verbo,N_atoms_in,N_reactants_in,molfracs_atoms, &
       molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
@@ -415,15 +410,15 @@ module chemequi_cea
       !! I/O:
       character, intent(in)            :: mode
       character(len=2), intent(in)     :: verbo
-      double precision, intent(in)     :: molfracs_atoms(N_atoms_in)
-      double precision, intent(out)    :: molfracs_reactants(N_reactants_in), massfracs_reactants(N_reactants_in)
+      real(dp), intent(in)     :: molfracs_atoms(N_atoms_in)
+      real(dp), intent(out)    :: molfracs_reactants(N_reactants_in), massfracs_reactants(N_reactants_in)
       integer, intent(in)              :: N_atoms_in, N_reactants_in
-      double precision, intent(in)     :: temp, press
-      double precision, intent(out)    :: nabla_ad,gamma2,MMW,rho,c_pe
+      real(dp), intent(in)     :: temp, press
+      real(dp), intent(out)    :: nabla_ad,gamma2,MMW,rho,c_pe
 
       !! Internal:
-      double precision                 :: C_P_0(N_reactants), H_0(N_reactants), S_0(N_reactants)
-      double precision                 :: molfracs_atoms_ions(N_atoms_in+1), temp_use
+      real(dp)                 :: C_P_0(N_reactants), H_0(N_reactants), S_0(N_reactants)
+      real(dp)                 :: molfracs_atoms_ions(N_atoms_in+1), temp_use
       integer                          :: N_atoms_use, gamma_neg_try
 
       error = .false.
@@ -487,9 +482,9 @@ module chemequi_cea
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(temp,N_reac,C_P_0, H_0, S_0)
       !! I/O
-      double precision, intent(in)  :: temp
+      real(dp), intent(in)  :: temp
       integer, intent(in)           :: N_reac
-      double precision, intent(out) :: C_P_0(N_reac), H_0(N_reac), &
+      real(dp), intent(out) :: C_P_0(N_reac), H_0(N_reac), &
       S_0(N_reac)
       !! internal
       integer                       :: i_reac, i_tempinv, tempinv_ind
@@ -544,28 +539,28 @@ module chemequi_cea
 
       !! I/O:
       integer, intent(in)              :: N_atoms_use, N_reac
-      double precision, intent(in)     :: molfracs_atoms(N_atoms_use)
-      double precision, intent(inout)  :: molfracs_reactants(N_reac), massfracs_reactants(N_reac)
-      DOUBLE PRECISION, intent(in)     :: temp, press
-      DOUBLE PRECISION, intent(in)     :: C_P_0(N_reac), H_0(N_reac), S_0(N_reac)
-      double precision, intent(out)    :: nabla_ad, gamma2, MMW, rho, c_pe
+      real(dp), intent(in)     :: molfracs_atoms(N_atoms_use)
+      real(dp), intent(inout)  :: molfracs_reactants(N_reac), massfracs_reactants(N_reac)
+      real(dp), intent(in)     :: temp, press
+      real(dp), intent(in)     :: C_P_0(N_reac), H_0(N_reac), S_0(N_reac)
+      real(dp), intent(out)    :: nabla_ad, gamma2, MMW, rho, c_pe
 
       !! CEA McBride 1994 style variables:
-      DOUBLE PRECISION  :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION  :: n_spec(N_reactants) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION  :: n_spec_old(N_reactants) ! Moles of species per total mass of mixture in kg of previous iteration
-      DOUBLE PRECISION  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided by (R*T)
-      DOUBLE PRECISION  :: matrix(N_reactants+N_atoms_use+1,N_reactants+N_atoms_use+1)
+      real(dp)  :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp)  :: n_spec(N_reactants) ! Moles of species per total mass of mixture in kg
+      real(dp)  :: n_spec_old(N_reactants) ! Moles of species per total mass of mixture in kg of previous iteration
+      real(dp)  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided by (R*T)
+      real(dp)  :: matrix(N_reactants+N_atoms_use+1,N_reactants+N_atoms_use+1)
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for condensed species, the pis and the delta log(n)
-      DOUBLE PRECISION  :: vector(N_reactants+N_atoms_use+1), solution_vector(N_reactants+N_atoms_use+1)
+      real(dp)  :: vector(N_reactants+N_atoms_use+1), solution_vector(N_reactants+N_atoms_use+1)
 
       !! Internal:
       INTEGER           :: i_iter, i_reac, inc_next, current_solids_number, N_spec_eff, buffer_ind, i_atom
       LOGICAL           :: converged, remove_cond, slowed
       LOGICAL           :: solid_inclu(N_cond), neg_cond(N_cond)
-      DOUBLE PRECISION  :: dgdnj(N_cond)
+      real(dp)  :: dgdnj(N_cond)
       INTEGER           :: solid_indices(N_cond), solid_indices_buff(N_cond)
-      DOUBLE PRECISION  :: nsum, mu_gas(N_gas), a_gas(N_gas,N_atoms_use), mass_species, atom_mass, msum
+      real(dp)  :: nsum, mu_gas(N_gas), a_gas(N_gas,N_atoms_use), mass_species, atom_mass, msum
 
       converged = .FALSE.
       slowed = .FALSE.
@@ -835,9 +830,9 @@ module chemequi_cea
    subroutine ec_INIT_ALL_VALS(N_atoms_use,N_reac,n,n_spec,pi_atom)
       !! I/O:
       integer, intent(in)           :: N_atoms_use, N_reac
-      DOUBLE PRECISION, intent(out) :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(out) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(out) :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
+      real(dp), intent(out) :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(out) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(out) :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
       ! by (R*T)
 
       !! Internal:
@@ -862,17 +857,17 @@ module chemequi_cea
       n_spec,solid_inclu,neg_cond,dgdnj,remove_cond,inc_next)
       !! I/O
       integer, intent(in)           :: N_atoms_use, N_reac
-      DOUBLE PRECISION, intent(in)  :: pi_atom(N_atoms_use)
-      DOUBLE PRECISION, intent(in)  :: H_0(N_reac), S_0(N_reac), temp
+      real(dp), intent(in)  :: pi_atom(N_atoms_use)
+      real(dp), intent(in)  :: H_0(N_reac), S_0(N_reac), temp
       LOGICAL, intent(in)           :: solid_inclu(N_reac-N_gas), neg_cond(N_reac-N_gas)
 
-      double precision, intent(inout)  :: n_spec(N_reac), dgdnj(N_reac-N_gas)
+      real(dp), intent(inout)  :: n_spec(N_reac), dgdnj(N_reac-N_gas)
       logical, intent(out)          :: remove_cond
       integer, intent(out)          :: inc_next
 
       !! Internal:
-      DOUBLE PRECISION             :: a(N_reactants,N_atoms_use)
-      DOUBLE PRECISION             :: mu(N_reactants), minval_inc
+      real(dp)             :: a(N_reactants,N_atoms_use)
+      real(dp)             :: mu(N_reactants), minval_inc
       INTEGER                      :: i_atom, i_reac, i_ratom, remove_count, remove_id
 
       !f2py integer, intent(aux) :: N_gas
@@ -944,11 +939,11 @@ module chemequi_cea
    subroutine ec_INIT_COND_VALS(N_atoms_use, N_reac, molfracs_atoms, i_cond, n_spec)
 
       integer, intent(in)              :: N_atoms_use, i_cond, N_reac
-      double precision, intent(in)     :: molfracs_atoms(N_atoms_use)
-      double precision, intent(inout)  :: n_spec(N_reac)
+      real(dp), intent(in)     :: molfracs_atoms(N_atoms_use)
+      real(dp), intent(inout)  :: n_spec(N_reac)
 
       integer           :: i_ratom, i_atom
-      double precision  :: min_molfrac, stoich_molfrac
+      real(dp)  :: min_molfrac, stoich_molfrac
 
       min_molfrac = -1
       do i_ratom = 1, 5
@@ -978,20 +973,20 @@ module chemequi_cea
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
-      DOUBLE PRECISION, intent(in) :: molfracs_atoms(N_atoms_use), press, temp
-      DOUBLE PRECISION, intent(in) ::  H_0(N_reac), S_0(N_reac)
-      DOUBLE PRECISION, intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(in) :: molfracs_atoms(N_atoms_use), press, temp
+      real(dp), intent(in) ::  H_0(N_reac), S_0(N_reac)
+      real(dp), intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
 
-      DOUBLE PRECISION, intent(out):: matrix(N_atoms_use+1+(N_species-N_gas),N_atoms_use+1+(N_species-N_gas))
+      real(dp), intent(out):: matrix(N_atoms_use+1+(N_species-N_gas),N_atoms_use+1+(N_species-N_gas))
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
       ! condensed species, the pis and the delta log(n)
-      DOUBLE PRECISION, intent(out):: vector(N_atoms_use+1+(N_species-N_gas))
-      DOUBLE PRECISION, intent(out):: mu_gas(N_gas), a_gas(N_gas,N_atoms_use)
+      real(dp), intent(out):: vector(N_atoms_use+1+(N_species-N_gas))
+      real(dp), intent(out):: mu_gas(N_gas), a_gas(N_gas,N_atoms_use)
 
       !! Internal:
-      DOUBLE PRECISION             :: b_0(N_atoms_use), b_0_norm, b(N_atoms_use)
-      DOUBLE PRECISION             :: a(N_species,N_atoms_use), mu(N_species)
+      real(dp)             :: b_0(N_atoms_use), b_0_norm, b(N_atoms_use)
+      real(dp)             :: a(N_species,N_atoms_use), mu(N_species)
       INTEGER                      :: i_atom, i_reac, i_ratom, i_atom2
 
       !f2py integer, intent(aux) :: N_gas
@@ -1189,34 +1184,34 @@ module chemequi_cea
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
-      DOUBLE PRECISION, intent(in) :: solution_vector(N_atoms_use+1+(N_species-N_gas))
-      DOUBLE PRECISION, intent(inout)  :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(in) :: n_spec_old(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
+      real(dp), intent(in) :: solution_vector(N_atoms_use+1+(N_species-N_gas))
+      real(dp), intent(inout)  :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(in) :: n_spec_old(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(inout)  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
       ! by (R*T)
       LOGICAL, intent(out)          :: converged
-      DOUBLE PRECISION, intent(in) :: mu_gas(N_gas), a_gas(N_gas,N_atoms_use), temp
+      real(dp), intent(in) :: mu_gas(N_gas), a_gas(N_gas,N_atoms_use), temp
 
       !! Internal:
       INTEGER                      :: i_reac
       INTEGER, save                :: n_done = 0
-      DOUBLE PRECISION             :: lambda, lambda1, lambda2
-      DOUBLE PRECISION, parameter  :: SIZE = 18.420681
+      real(dp)             :: lambda, lambda1, lambda2
+      real(dp), parameter  :: SIZE = 18.420681
       LOGICAL                      :: gas_good, solids_good, total_good
-      DOUBLE PRECISION             :: delta_n_gas(N_gas)
+      real(dp)             :: delta_n_gas(N_gas)
 
       ! IONS
       INTEGER                      :: i_ion, i_stoich
-      DOUBLE PRECISION             :: pi_ion, pi_ion_norm
+      real(dp)             :: pi_ion, pi_ion_norm
 
       ! MASS BALANCE CHECKS
-      DOUBLE PRECISION             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
-      DOUBLE PRECISION             :: a(N_species,N_atoms_use), mval_mass_good
+      real(dp)             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
+      real(dp)             :: a(N_species,N_atoms_use), mval_mass_good
       INTEGER                      :: i_atom, i_ratom
       LOGICAL                      :: mass_good, pi_good
-      DOUBLE PRECISION             :: molfracs_atoms(N_atoms_use)
-      DOUBLE PRECISION             :: change
+      real(dp)             :: molfracs_atoms(N_atoms_use)
+      real(dp)             :: change
 
       !f2py integer, intent(aux) :: N_gas
 
@@ -1443,20 +1438,20 @@ module chemequi_cea
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
-      DOUBLE PRECISION, intent(in) :: molfracs_atoms(N_atoms_use), press, temp
-      DOUBLE PRECISION, intent(in) :: H_0(N_reac), S_0(N_reac)
-      DOUBLE PRECISION, intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
-      ! DOUBLE PRECISION, intent(in) :: pi_atom(N_atoms) ! Lagrangian multipliers for the atomic species divided
+      real(dp), intent(in) :: molfracs_atoms(N_atoms_use), press, temp
+      real(dp), intent(in) :: H_0(N_reac), S_0(N_reac)
+      real(dp), intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      ! real(dp), intent(in) :: pi_atom(N_atoms) ! Lagrangian multipliers for the atomic species divided
       ! ! by (R*T)
-      DOUBLE PRECISION, intent(out):: matrix(N_species+N_atoms_use+1,N_species+N_atoms_use+1)
+      real(dp), intent(out):: matrix(N_species+N_atoms_use+1,N_species+N_atoms_use+1)
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
       ! condensed species, the pis and the delta log(n)
-      DOUBLE PRECISION, intent(out):: vector(N_species+N_atoms_use+1)
+      real(dp), intent(out):: vector(N_species+N_atoms_use+1)
 
       !! Internal:
-      DOUBLE PRECISION             :: b_0(N_atoms_use), b_0_norm, b(N_atoms_use)
-      DOUBLE PRECISION             :: a(N_species,N_atoms_use), mu(N_species)
+      real(dp)             :: b_0(N_atoms_use), b_0_norm, b(N_atoms_use)
+      real(dp)             :: a(N_species,N_atoms_use), mu(N_species)
       INTEGER                      :: i_atom, i_reac, i_ratom
 
       ! Set up b0
@@ -1628,32 +1623,32 @@ module chemequi_cea
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
       INTEGER , intent(in)         :: solid_indices(N_solids)
-      DOUBLE PRECISION, intent(in) :: solution_vector(N_species+N_atoms_use+1)
-      DOUBLE PRECISION, intent(inout)  :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(in)     :: n_spec_old(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(inout)  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
+      real(dp), intent(in) :: solution_vector(N_species+N_atoms_use+1)
+      real(dp), intent(inout)  :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(inout)  :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(in)     :: n_spec_old(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(inout)  :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
       ! by (R*T)
       LOGICAL , intent(out)         :: converged
 
       !! Internal:
       INTEGER                      :: i_reac
       INTEGER, save                :: n_done = 0
-      DOUBLE PRECISION             :: lambda, lambda1, lambda2
-      DOUBLE PRECISION, parameter  :: SIZE = 18.420681
+      real(dp)             :: lambda, lambda1, lambda2
+      real(dp), parameter  :: SIZE = 18.420681
       LOGICAL                      :: gas_good, solids_good, total_good
 
       ! IONS
       INTEGER                      :: i_ion, i_stoich
-      DOUBLE PRECISION             :: pi_ion, pi_ion_norm
+      real(dp)             :: pi_ion, pi_ion_norm
 
       ! MASS BALANCE CHECKS
-      DOUBLE PRECISION             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
-      DOUBLE PRECISION             :: a(N_species,N_atoms_use), mval_mass_good
+      real(dp)             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
+      real(dp)             :: a(N_species,N_atoms_use), mval_mass_good
       INTEGER                      :: i_atom, i_ratom
       LOGICAL                      :: mass_good, pi_good
-      DOUBLE PRECISION             :: molfracs_atoms(N_atoms_use)
-      DOUBLE precision             :: change
+      real(dp)             :: molfracs_atoms(N_atoms_use)
+      real(dp)             :: change
 
 
       ! Calculate correction factors as described in Section 3.3 of the McBride Manual
@@ -1871,19 +1866,19 @@ module chemequi_cea
       !! I/O:
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_spec_eff, N_solids
       INTEGER, intent(in)          :: solid_indices(N_solids)
-      DOUBLE PRECISION, intent(in) :: temp
-      DOUBLE PRECISION, intent(in) :: C_P_0(N_reac), H_0(N_reac)
-      DOUBLE PRECISION, intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
-      DOUBLE PRECISION, intent(in) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
-      DOUBLE PRECISION, intent(out):: nabla_ad, gamma2, c_pe
+      real(dp), intent(in) :: temp
+      real(dp), intent(in) :: C_P_0(N_reac), H_0(N_reac)
+      real(dp), intent(in) :: n ! Moles of gas particles per total mass of mixture in kg
+      real(dp), intent(in) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
+      real(dp), intent(out):: nabla_ad, gamma2, c_pe
 
       !! Internal:
-      DOUBLE PRECISION             :: matrix(N_atoms_use+1+(N_spec_eff-N_gas),N_atoms_use+1+(N_spec_eff-N_gas))
+      real(dp)             :: matrix(N_atoms_use+1+(N_spec_eff-N_gas),N_atoms_use+1+(N_spec_eff-N_gas))
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
       ! condensed species, the pis and the delta log(n)
-      DOUBLE PRECISION             :: vector(N_atoms_use+1+(N_spec_eff-N_gas)), &
+      real(dp)             :: vector(N_atoms_use+1+(N_spec_eff-N_gas)), &
       solution_vector(N_atoms_use+1+(N_spec_eff-N_gas))
-      DOUBLE PRECISION             :: a(N_spec_eff,N_atoms_use)
+      real(dp)             :: a(N_spec_eff,N_atoms_use)
       INTEGER                      :: i_atom, i_reac, i_ratom, i_atom2
 
       ! Set up a_ij
@@ -2014,11 +2009,11 @@ module chemequi_cea
 
    subroutine ec_b_0(N_atoms_use, molfracs_atoms, b_0_norm, b_0)
       integer, intent(in)           :: N_atoms_use
-      double precision, intent(in)  :: molfracs_atoms(N_atoms_use)
-      double precision, intent(out) :: b_0_norm, b_0(N_atoms_use)
+      real(dp), intent(in)  :: molfracs_atoms(N_atoms_use)
+      real(dp), intent(out) :: b_0_norm, b_0(N_atoms_use)
 
       integer                       :: i_atom
-      double precision              :: mass_atom
+      real(dp)              :: mass_atom
 
       ! Set up b0
       b_0_norm = 0d0
@@ -2032,7 +2027,7 @@ module chemequi_cea
 
    ! subroutine ec_a(N_atoms_use, a)
    !    integer, intent(in)           :: N_atoms_use
-   !    double precision, intent(out) :: a()
+   !    real(dp), intent(out) :: a()
    !    a = 0d0
    !    DO i_atom = 1, N_atoms_use
    !       DO i_reac = 1, N_gas
@@ -2058,8 +2053,6 @@ module chemequi_cea
    !       END DO
    !    END DO
    ! end subroutine ec_a
-
-
 
    !> Taken from http://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html#RANDOM_005fSEED
    subroutine INIT_RAND_SEED()
@@ -2115,37 +2108,18 @@ module chemequi_cea
 
    !> Invert the small matrix
    subroutine ec_INVERT_MATRIX_SHORT(lens,matrix,vector,solution_vector)
-      use data_block, only: error
-      implicit none
+      ! use data_block, only: error
+      ! implicit none
       !! I/O:
       INTEGER, intent(in)           :: lens
-      DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
+      real(dp), intent(inout)  :: matrix(lens,lens)
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
       ! condensed species, the pis and the delta log(n)
-      DOUBLE PRECISION, intent(in)  :: vector(lens)
-      double precision, intent(out) :: solution_vector(lens)
+      real(dp), intent(in)  :: vector(lens)
+      real(dp), intent(out) :: solution_vector(lens)
       !! Internal:
       INTEGER                      :: index(lens)
-      DOUBLE PRECISION             :: indic
-
-      interface
-      subroutine ec_LUDCMP(a,indx,d)
-         double precision, intent(inout)  :: a(:,:)
-         integer, intent(out)             :: indx(:)
-         double precision, intent(out)    :: d
-
-         double precision                 :: vv(size(a,1))
-         double precision, parameter      :: TINY = 1.0e-20
-         integer                          :: j, n, imax
-      end subroutine ec_LUDCMP
-      subroutine ec_LUBKSB(a,indx,b)
-         double precision, intent(in) :: a(:,:)
-         integer, intent(in) :: indx(:)
-         double precision, intent(inout) :: b(:)
-         integer :: i,n,ii,ll
-         double precision :: summ
-      end subroutine ec_LUBKSB
-      end interface
+      real(dp)             :: indic
 
       solution_vector = vector
 
@@ -2157,43 +2131,24 @@ module chemequi_cea
 
    !> Invert the big matrix
    subroutine ec_INVERT_MATRIX_LONG(lens,matrix,vector,solution_vector)
-      use data_block, only: N_gas, N_ions, remove_ions, reac_ion, error
-      implicit none
+      ! use data_block, only: N_gas, N_ions, remove_ions, reac_ion, error
+      ! implicit none
       !! I/O:
       INTEGER, intent(in)           :: lens
-      DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
-      double precision, intent(in)  :: vector(lens)
-      double precision, intent(out) :: solution_vector(lens)
+      real(dp), intent(inout)  :: matrix(lens,lens)
+      real(dp), intent(in)  :: vector(lens)
+      real(dp), intent(out) :: solution_vector(lens)
       ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
       ! condensed species, the pis and the delta log(n)
 
-      double precision              :: matrix_nions(lens-N_ions,lens-N_ions)
-      DOUBLE PRECISION              :: vector_nions(lens-N_ions), &
+      real(dp)              :: matrix_nions(lens-N_ions,lens-N_ions)
+      real(dp)              :: vector_nions(lens-N_ions), &
       solution_vector_nions(lens-N_ions)
 
       !! Internal:
       INTEGER                       :: index(lens), corrf_i, corrf_j, index_nions(lens-N_ions)
-      DOUBLE PRECISION              :: indic
+      real(dp)              :: indic
       INTEGER                       :: i_mat, j_mat
-
-      interface
-      subroutine ec_LUDCMP(a,indx,d)
-         double precision, intent(inout)  :: a(:,:)
-         integer, intent(out)             :: indx(:)
-         double precision, intent(out)    :: d
-
-         double precision                 :: vv(size(a,1))
-         double precision, parameter      :: TINY = 1.0e-20
-         integer                          :: j, n, imax
-      end subroutine ec_LUDCMP
-      subroutine ec_LUBKSB(a,indx,b)
-         double precision, intent(in) :: a(:,:)
-         integer, intent(in) :: indx(:)
-         double precision, intent(inout) :: b(:)
-         integer :: i,n,ii,ll
-         double precision :: summ
-      end subroutine ec_LUBKSB
-      end interface
 
       solution_vector = vector
 
@@ -2249,14 +2204,14 @@ module chemequi_cea
 
    !> LU decomposition, from numerical recipes
    subroutine ec_LUDCMP(a,indx,d)
-      use data_block, only: error, err_msg
-      implicit none
-      double precision, intent(inout)  :: a(:,:)
+      ! use data_block, only: error, err_msg
+      ! implicit none
+      real(dp), intent(inout)  :: a(:,:)
       integer, intent(out)             :: indx(:)
-      double precision, intent(out)    :: d
+      real(dp), intent(out)    :: d
 
-      double precision                 :: vv(size(a,1))
-      double precision, parameter      :: TINY = 1.0e-20
+      real(dp)                 :: vv(size(a,1))
+      real(dp), parameter      :: TINY = 1.0e-20
       integer                          :: j, n, imax
 
       n = lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUDCMP')
@@ -2288,13 +2243,13 @@ module chemequi_cea
 
    !> LU back substitution
    SUBROUTINE ec_LUBKSB(a,indx,b)
-      use data_block, only: error
-      implicit none
-      double precision, intent(in) :: a(:,:)
+      ! use data_block, only: error
+      ! implicit none
+      real(dp), intent(in) :: a(:,:)
       integer, intent(in) :: indx(:)
-      double precision, intent(inout) :: b(:)
+      real(dp), intent(inout) :: b(:)
       integer :: i,n,ii,ll
-      double precision :: summ
+      real(dp) :: summ
 
       n=lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUBKSB')
       if (error) RETURN
@@ -2319,8 +2274,8 @@ module chemequi_cea
    subroutine lu_swap(len,arr1,arr2)
       implicit none
       integer, intent(in)              :: len
-      double precision, intent(inout)  :: arr1(len), arr2(len)
-      double precision                 :: tamp(len)
+      real(dp), intent(inout)  :: arr1(len), arr2(len)
+      real(dp)                 :: tamp(len)
 
       tamp = arr1
       arr1 = arr2
@@ -2328,8 +2283,8 @@ module chemequi_cea
    end subroutine lu_swap
 
    function lu_asserteq(n1,n2,n3,label) result(m)
-      use data_block, only: error, err_msg
-      implicit none
+      ! use data_block, only: error, err_msg
+      ! implicit none
       integer, intent(in)        :: n1, n2, n3
       character(len=9), intent(in)   :: label
       integer                    :: m
