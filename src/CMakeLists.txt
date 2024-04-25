@@ -8,6 +8,7 @@ CPMAddPackage(
 )
 
 add_library(equichem
+  chemequi_yaml.f90
   chemequi_const.f90
   chemequi_cea.f90
   chemequi.f90

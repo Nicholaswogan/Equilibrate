@@ -34,6 +34,7 @@ module chemequi_cea
       ! integer :: N_coeffs = 10, N_temps = 10
       integer, allocatable    :: thermo_data_n_coeffs(:,:)  !(N_temps,N_reac)
       integer, allocatable    :: thermo_data_n_intervs(:)  !(N_reac)
+      integer, allocatable    :: thermo_data_kind(:) !(N_reac)
       real(dp), allocatable   :: thermo_data(:,:,:)  !(N_coeffs,N_temps,N_reac)
       real(dp), allocatable   :: thermo_data_temps(:,:,:)  !(2,N_temps,N_reac)
       real(dp), allocatable   :: thermo_data_T_exps(:,:,:)  !(8,N_temps,N_reac)
@@ -73,6 +74,7 @@ contains
          deallocate(self%reac_ion)
          deallocate(self%thermo_data_n_coeffs)
          deallocate(self%thermo_data_n_intervs)
+         deallocate(self%thermo_data_kind)
          deallocate(self%thermo_data)
          deallocate(self%thermo_data_temps)
          deallocate(self%thermo_data_T_exps)
@@ -94,6 +96,7 @@ contains
 
          allocate(self%thermo_data_n_coeffs(N_temps,self%N_reactants))
          allocate(self%thermo_data_n_intervs(self%N_reactants))
+         allocate(self%thermo_data_kind(self%N_reactants))
          allocate(self%thermo_data(N_coeffs,N_temps,self%N_reactants))
          allocate(self%thermo_data_temps(2,N_temps,self%N_reactants))
          allocate(self%thermo_data_T_exps(8,N_temps,self%N_reactants))
@@ -106,9 +109,18 @@ contains
       ! call da_CH2STR(reac_char, self%names_reactants_orig)
       self%names_reactants_orig = reac_char
 
+      if (file_extension(fpath) == 'yaml') then
+
+      call read_thermo_yaml(self, fpath)
+      if (self%error) return
+
+      else
+
       ! Set all thermodynamic data
       call da_READ_THERMO(self, fpath)
       if (self%error) RETURN
+
+      endif
 
       ! ATOMS
       if (N_atoms_in+1 /= self%N_atoms .and. allocated(self%names_atoms)) then
@@ -131,6 +143,153 @@ contains
       call da_REAC_ATOMS_ID(self)
 
    end subroutine SET_DATA
+
+   subroutine read_thermo_yaml(self, fpath)
+      use chemequi_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial
+      class(CEAData), intent(inout) :: self
+      character(*), intent(in) :: fpath
+
+      character(:), allocatable :: err
+      type(ReactantList) :: rl
+      character(len=reac_str_len) :: name1, name2
+      logical :: found
+      integer :: i, j, k, kk
+
+      rl = ReactantList(fpath, err)
+      if (allocated(err)) then
+         self%error = .true.
+         self%err_msg = err
+         return
+      endif
+
+      ! Not set and not used in code later
+      self%form_heat_Jmol_298_15_K = 0.0_dp
+      self%thermo_data_n_coeffs = 0
+      self%thermo_data_T_exps = 0.0_dp
+      self%H_0_298_15_K_m_H_0_0_K = 0.0_dp
+
+
+      self%N_gas = 0
+      ! first loop sets self%N_gas and self%reac_condensed
+      do i = 1,self%N_reactants
+         call uppercase(self%names_reactants_orig(i), name1)
+
+         found = .false.
+         do j = 1,rl%nr
+            call uppercase(rl%r(j)%name, name2)
+            if (trim(name1) == trim(name2)) then
+               found = .true.
+
+               self%reac_condensed(i) = rl%r(j)%condensate
+               if (.not.self%reac_condensed(i)) then
+                  self%N_gas = self%N_gas + 1
+               endif
+
+               exit
+            endif
+         enddo
+
+         if (.not.found) then
+            self%error = .true.
+            self%err_msg = 'Reactant '//trim(self%names_reactants_orig(i))//' was not found in '// &
+                           trim(fpath)
+            return
+         endif
+      enddo
+
+      self%N_cond = self%N_reactants - self%N_gas
+
+      call da_REORDER_SPECS(self)
+
+      self%thermo_data_n_intervs = -1
+      self%N_ions = 0
+      self%reac_ion = .false.
+      self%ions = .false.
+      self%reac_atoms_names = ''
+      self%reac_stoich = 0
+
+      do i = 1,self%N_reactants
+         call uppercase(self%names_reactants(i), name1)
+
+         do j = 1,rl%nr
+            call uppercase(rl%r(j)%name, name2)
+            if (trim(name1) == trim(name2)) then
+
+               ! Number of temperature intervals
+               self%thermo_data_n_intervs(i) = rl%r(j)%thermo%ntemps
+
+               ! Atoms on species
+               kk = 1
+               do k = 1,rl%natoms
+                  if (rl%r(j)%composition(k) /= 0) then
+                     if (kk > size(self%reac_atoms_names,1)) then
+                        self%error = .true.
+                        self%err_msg = 'The maximum number of atoms for a species is 5. '// &
+                                       'The species '//trim(self%names_reactants(i))//' has more than this.'
+                        return
+                     endif
+
+                     self%reac_atoms_names(kk,i) = trim(rl%atoms_names(k))
+                     self%reac_stoich(kk,i) = rl%r(j)%composition(k)
+                     if (trim(rl%atoms_names(k)) == 'E') then
+                        self%ions = .true.
+                        self%reac_ion(i) = .true.
+                        self%N_ions = self%N_ions + 1
+                     endif
+                     kk = kk + 1
+                  endif
+               enddo
+
+               self%mol_weight(i) = rl%r(j)%mass
+
+               self%thermo_data_kind(i) = rl%r(j)%thermo%dtype
+
+               ! Thermodynamic data
+               do k = 1,rl%r(j)%thermo%ntemps
+                  if (k > size(self%thermo_data_temps,2)) then
+                     self%error = .true.
+                     self%err_msg = 'The maximum number of thermodynamic intervals is 10. '// &
+                                    'The species '//trim(self%names_reactants(i))//' has more than this.'
+                     return
+                  endif
+
+                  self%thermo_data_temps(1,k,i) = rl%r(j)%thermo%temps(k)
+                  self%thermo_data_temps(2,k,i) = rl%r(j)%thermo%temps(k+1)
+
+                  if (rl%r(j)%thermo%dtype == ShomatePolynomial) then
+                     self%thermo_data(1:7,k,i) = rl%r(j)%thermo%data(:,k)
+                  elseif (rl%r(j)%thermo%dtype == Nasa9Polynomial) then
+                     self%thermo_data(1:9,k,i) = rl%r(j)%thermo%data(:,k)
+                     self%thermo_data(10,k,i) = self%thermo_data(9,k,i) 
+                     self%thermo_data(9,k,i) = 0.0_dp
+                  endif
+               enddo
+
+               exit
+            endif
+         enddo
+      enddo
+
+   end subroutine
+
+   function file_extension(filename) result(ext)
+      character(*), intent(in) :: filename
+      character(:), allocatable :: ext
+
+      character(:), allocatable :: filename_trim
+      integer :: i, j
+
+      filename_trim = trim(filename)
+
+      do i = len(filename_trim),1,-1
+         if (filename_trim(i:i) == '.') exit
+      enddo
+      ext = ''
+      do j = i+1,len(filename_trim)
+         ext = ext//filename_trim(j:j)
+      enddo 
+
+   end function
 
    !> Convert a 2-dimensional array of characters into an array of strings ; used in SET_DATA
    ! subroutine da_CH2STR(chr, str)
@@ -220,6 +379,7 @@ contains
 
    !> Read in provided file all thermodynamic data
    subroutine da_READ_THERMO(self, fpath)
+      use chemequi_yaml, only: Nasa9Polynomial
       class(CEAData), intent(inout) :: self
       character(*), intent(in) :: fpath
       character(len=80)             :: file_line, file_line_up
@@ -233,6 +393,8 @@ contains
 
       self%reac_ion = .FALSE.
       self%ions = .FALSE.
+
+      self%thermo_data_kind = Nasa9Polynomial
 
       open(unit=17,file=fpath, action="READ", status="OLD")
       do while (1>0)
@@ -466,6 +628,7 @@ contains
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(self,temp,N_reac,C_P_0, H_0, S_0)
       use chemequi_const, only: R
+      use chemequi_yaml, only: ShomatePolynomial, Nasa9Polynomial
       !! I/O
       class(CEAData), intent(inout) :: self
       real(dp), intent(in)  :: temp
@@ -492,31 +655,79 @@ contains
             end do
          end if
 
+         if (self%thermo_data_kind(i_reac) == Nasa9Polynomial) then
          ! Calculate thermodynamic quantities as explained in Gordon 1996, page 74
          C_P_0(i_reac) = (self%thermo_data(1,tempinv_ind,i_reac)*temp**(-2)+ &
          self%thermo_data(2,tempinv_ind,i_reac)*temp**(-1)+ &
          self%thermo_data(3,tempinv_ind,i_reac)+self%thermo_data(4,tempinv_ind,i_reac)* &
          temp**(1)+self%thermo_data(5,tempinv_ind,i_reac)*temp**(2)+ &
          self%thermo_data(6,tempinv_ind,i_reac)*temp**(3)+self%thermo_data(7,tempinv_ind,i_reac)* &
-         temp**(4))*R
+         temp**(4))*R ! J/(K*mol)
          H_0(i_reac) = (-self%thermo_data(1,tempinv_ind,i_reac)*temp**(-2)+ &
          self%thermo_data(2,tempinv_ind,i_reac)*temp**(-1)*log(temp)+ &
          self%thermo_data(3,tempinv_ind,i_reac)+self%thermo_data(4,tempinv_ind,i_reac)*temp**(1)/2d0+ &
          self%thermo_data(5,tempinv_ind,i_reac)*temp**(2)/3d0+ &
          self%thermo_data(6,tempinv_ind,i_reac)*temp**(3)/4d0+self%thermo_data(7,tempinv_ind,i_reac)* &
          temp**(4)/5d0+self%thermo_data(9,tempinv_ind,i_reac)/temp)* &
-         R*temp
+         R*temp ! J/mol
          S_0(i_reac) = (-self%thermo_data(1,tempinv_ind,i_reac)*temp**(-2)/2d0- &
          self%thermo_data(2,tempinv_ind,i_reac)*temp**(-1)+ &
          self%thermo_data(3,tempinv_ind,i_reac)*log(temp)+ &
          self%thermo_data(4,tempinv_ind,i_reac)*temp**(1)+ &
          self%thermo_data(5,tempinv_ind,i_reac)*temp**(2)/2d0+ &
          self%thermo_data(6,tempinv_ind,i_reac)*temp**(3)/3d0+self%thermo_data(7,tempinv_ind,i_reac)* &
-         temp**(4)/4d0+self%thermo_data(10,tempinv_ind,i_reac))*R
+         temp**(4)/4d0+self%thermo_data(10,tempinv_ind,i_reac))*R ! J/(K*mol)
+
+         elseif (self%thermo_data_kind(i_reac) == ShomatePolynomial) then
+
+         C_P_0(i_reac) = heat_capacity_shomate(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/(K*mol)
+         H_0(i_reac) = enthalpy_shomate(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/mol
+         S_0(i_reac) = entropy_shomate(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/(K*mol)
+
+         endif
 
       end do
 
    end subroutine ec_COMP_THERMO_QUANTS
+
+   pure function heat_capacity_shomate(coeffs, T) result(cp)
+      real(dp), intent(in) :: coeffs(7)
+      real(dp), intent(in) :: T
+      real(dp) :: cp !! J/(mol K)
+      
+      real(dp) :: TT
+      
+      TT = T/1000.0_dp
+      cp = coeffs(1) + coeffs(2)*TT + coeffs(3)*TT**2 + &
+            coeffs(4)*TT**3 + coeffs(5)/TT**2
+   end function
+
+   pure function enthalpy_shomate(coeffs, T) result(enthalpy)
+      real(dp), intent(in) :: coeffs(7)
+      real(dp), intent(in) :: T
+      real(dp) :: enthalpy !! J/mol
+
+      real(dp) :: TT
+
+      TT = T/1000.0_dp
+      enthalpy = coeffs(1)*TT + (coeffs(2)*TT**2)/2.0_dp &
+               + (coeffs(3)*TT**3)/3.0_dp  + (coeffs(4)*TT**4)/4.0_dp &
+               - coeffs(5)/TT + coeffs(6)
+      enthalpy = enthalpy*1000.0_dp
+   end function
+
+   pure function entropy_shomate(coeffs, T) result(entropy)
+      real(dp), intent(in) :: coeffs(7)
+      real(dp), intent(in) :: T
+      real(dp) :: entropy !! J/(mol K)
+      
+      real(dp) :: TT
+      
+      TT = T/1000.0_dp
+      entropy = coeffs(1)*log(TT) + coeffs(2)*TT &
+               + (coeffs(3)*TT**2)/2.0_dp + (coeffs(4)*TT**3)/3.0_dp &
+               - coeffs(5)/(2.0_dp * TT**2) + coeffs(7)
+   end function
 
    !> Computes the specie abundances (molar and mass)
    recursive subroutine ec_COMP_EQU_CHEM(self, N_atoms_use, N_reac, molfracs_atoms, &
