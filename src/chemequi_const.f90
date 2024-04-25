@@ -32,6 +32,7 @@ module chemequi_const
   ,195.078d0,196.9665d0,200.59d0,204.3833d0,207.2d0,208.9804d0,209d0,210d0,222d0,223d0,226d0,227d0,232.0381d0 &
   ,231.0359d0,238.0289d0,237d0,244d0,243d0,247d0,247d0,251d0,252d0,257d0,258d0,259d0,262d0/)
 
-
+  ! For thermo arrays
+  integer, parameter      :: N_coeffs = 10, N_temps = 10
 
 end module
