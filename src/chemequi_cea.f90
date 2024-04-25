@@ -1,10 +1,5 @@
-!> ------------------------------------
-!>        EASY CHEM, a CEA clone
-!> ------------------------------------
 
-
-!> DATA STORAGE MODULE
-module data_block
+module chemequi_cea
    implicit none
    ! private
 
@@ -2118,247 +2113,236 @@ module data_block
       end function lcg
    end subroutine INIT_RAND_SEED
 
-end module data_block
+   !> Invert the small matrix
+   subroutine ec_INVERT_MATRIX_SHORT(lens,matrix,vector,solution_vector)
+      use data_block, only: error
+      implicit none
+      !! I/O:
+      INTEGER, intent(in)           :: lens
+      DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
+      ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
+      ! condensed species, the pis and the delta log(n)
+      DOUBLE PRECISION, intent(in)  :: vector(lens)
+      double precision, intent(out) :: solution_vector(lens)
+      !! Internal:
+      INTEGER                      :: index(lens)
+      DOUBLE PRECISION             :: indic
 
+      interface
+      subroutine ec_LUDCMP(a,indx,d)
+         double precision, intent(inout)  :: a(:,:)
+         integer, intent(out)             :: indx(:)
+         double precision, intent(out)    :: d
 
+         double precision                 :: vv(size(a,1))
+         double precision, parameter      :: TINY = 1.0e-20
+         integer                          :: j, n, imax
+      end subroutine ec_LUDCMP
+      subroutine ec_LUBKSB(a,indx,b)
+         double precision, intent(in) :: a(:,:)
+         integer, intent(in) :: indx(:)
+         double precision, intent(inout) :: b(:)
+         integer :: i,n,ii,ll
+         double precision :: summ
+      end subroutine ec_LUBKSB
+      end interface
 
-!> Invert the small matrix
-subroutine ec_INVERT_MATRIX_SHORT(lens,matrix,vector,solution_vector)
-   use data_block, only: error
-   implicit none
-   !! I/O:
-   INTEGER, intent(in)           :: lens
-   DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
-   ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
-   ! condensed species, the pis and the delta log(n)
-   DOUBLE PRECISION, intent(in)  :: vector(lens)
-   double precision, intent(out) :: solution_vector(lens)
-   !! Internal:
-   INTEGER                      :: index(lens)
-   DOUBLE PRECISION             :: indic
+      solution_vector = vector
 
-   interface
-   subroutine ec_LUDCMP(a,indx,d)
-      double precision, intent(inout)  :: a(:,:)
-      integer, intent(out)             :: indx(:)
-      double precision, intent(out)    :: d
-
-      double precision                 :: vv(size(a,1))
-      double precision, parameter      :: TINY = 1.0e-20
-      integer                          :: j, n, imax
-   end subroutine ec_LUDCMP
-   subroutine ec_LUBKSB(a,indx,b)
-      double precision, intent(in) :: a(:,:)
-      integer, intent(in) :: indx(:)
-      double precision, intent(inout) :: b(:)
-      integer :: i,n,ii,ll
-      double precision :: summ
-   end subroutine ec_LUBKSB
-   end interface
-
-   solution_vector = vector
-
-   call ec_LUDCMP(matrix,index,indic)
-   if (error) RETURN
-   call ec_LUBKSB(matrix,index,solution_vector)
-
-end subroutine ec_INVERT_MATRIX_SHORT
-
-!> Invert the big matrix
-subroutine ec_INVERT_MATRIX_LONG(lens,matrix,vector,solution_vector)
-   use data_block, only: N_gas, N_ions, remove_ions, reac_ion, error
-   implicit none
-   !! I/O:
-   INTEGER, intent(in)           :: lens
-   DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
-   double precision, intent(in)  :: vector(lens)
-   double precision, intent(out) :: solution_vector(lens)
-   ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
-   ! condensed species, the pis and the delta log(n)
-
-   double precision              :: matrix_nions(lens-N_ions,lens-N_ions)
-   DOUBLE PRECISION              :: vector_nions(lens-N_ions), &
-   solution_vector_nions(lens-N_ions)
-
-   !! Internal:
-   INTEGER                       :: index(lens), corrf_i, corrf_j, index_nions(lens-N_ions)
-   DOUBLE PRECISION              :: indic
-   INTEGER                       :: i_mat, j_mat
-
-   interface
-   subroutine ec_LUDCMP(a,indx,d)
-      double precision, intent(inout)  :: a(:,:)
-      integer, intent(out)             :: indx(:)
-      double precision, intent(out)    :: d
-
-      double precision                 :: vv(size(a,1))
-      double precision, parameter      :: TINY = 1.0e-20
-      integer                          :: j, n, imax
-   end subroutine ec_LUDCMP
-   subroutine ec_LUBKSB(a,indx,b)
-      double precision, intent(in) :: a(:,:)
-      integer, intent(in) :: indx(:)
-      double precision, intent(inout) :: b(:)
-      integer :: i,n,ii,ll
-      double precision :: summ
-   end subroutine ec_LUBKSB
-   end interface
-
-   solution_vector = vector
-
-   !matrix(N_reactants+N_atoms+1,N_reactants+N_atoms+1)
-   IF (remove_ions) THEN
-      vector_nions = 0d0
-      matrix_nions = 0d0
-      corrf_i = 0
-      DO i_mat = 1, lens
-         corrf_j = 0
-         IF (i_mat <= N_gas) THEN
-            IF (reac_ion(i_mat)) THEN
-               corrf_i = corrf_i + 1
-               cycle
-            END IF
-         END IF
-         DO j_mat = 1, lens
-            IF (j_mat <= N_gas) THEN
-               IF (reac_ion(j_mat)) THEN
-                  corrf_j = corrf_j + 1
-                  cycle
-               END IF
-            END IF
-            matrix_nions(j_mat-corrf_j,i_mat-corrf_i) = matrix(j_mat,i_mat)
-         END DO
-         vector_nions(i_mat-corrf_i) = vector(i_mat)
-      END DO
-      solution_vector_nions = vector_nions
-
-      call ec_LUDCMP(matrix_nions,index_nions,indic)
-      if (error) RETURN
-      call ec_LUBKSB(matrix_nions,index_nions,solution_vector_nions)
-      if (error) RETURN
-
-      corrf_i = 0
-      DO i_mat = 1, lens
-         IF (i_mat <= N_gas) THEN
-            IF (reac_ion(i_mat)) THEN
-               corrf_i = corrf_i + 1
-               cycle
-            END IF
-         END IF
-         solution_vector(i_mat) = solution_vector_nions(i_mat-corrf_i)
-      END DO
-   ELSE
       call ec_LUDCMP(matrix,index,indic)
       if (error) RETURN
       call ec_LUBKSB(matrix,index,solution_vector)
+
+   end subroutine ec_INVERT_MATRIX_SHORT
+
+   !> Invert the big matrix
+   subroutine ec_INVERT_MATRIX_LONG(lens,matrix,vector,solution_vector)
+      use data_block, only: N_gas, N_ions, remove_ions, reac_ion, error
+      implicit none
+      !! I/O:
+      INTEGER, intent(in)           :: lens
+      DOUBLE PRECISION, intent(inout)  :: matrix(lens,lens)
+      double precision, intent(in)  :: vector(lens)
+      double precision, intent(out) :: solution_vector(lens)
+      ! So the solution vector will contain the delta log(n_j) for gas, the delta n_j for
+      ! condensed species, the pis and the delta log(n)
+
+      double precision              :: matrix_nions(lens-N_ions,lens-N_ions)
+      DOUBLE PRECISION              :: vector_nions(lens-N_ions), &
+      solution_vector_nions(lens-N_ions)
+
+      !! Internal:
+      INTEGER                       :: index(lens), corrf_i, corrf_j, index_nions(lens-N_ions)
+      DOUBLE PRECISION              :: indic
+      INTEGER                       :: i_mat, j_mat
+
+      interface
+      subroutine ec_LUDCMP(a,indx,d)
+         double precision, intent(inout)  :: a(:,:)
+         integer, intent(out)             :: indx(:)
+         double precision, intent(out)    :: d
+
+         double precision                 :: vv(size(a,1))
+         double precision, parameter      :: TINY = 1.0e-20
+         integer                          :: j, n, imax
+      end subroutine ec_LUDCMP
+      subroutine ec_LUBKSB(a,indx,b)
+         double precision, intent(in) :: a(:,:)
+         integer, intent(in) :: indx(:)
+         double precision, intent(inout) :: b(:)
+         integer :: i,n,ii,ll
+         double precision :: summ
+      end subroutine ec_LUBKSB
+      end interface
+
+      solution_vector = vector
+
+      !matrix(N_reactants+N_atoms+1,N_reactants+N_atoms+1)
+      IF (remove_ions) THEN
+         vector_nions = 0d0
+         matrix_nions = 0d0
+         corrf_i = 0
+         DO i_mat = 1, lens
+            corrf_j = 0
+            IF (i_mat <= N_gas) THEN
+               IF (reac_ion(i_mat)) THEN
+                  corrf_i = corrf_i + 1
+                  cycle
+               END IF
+            END IF
+            DO j_mat = 1, lens
+               IF (j_mat <= N_gas) THEN
+                  IF (reac_ion(j_mat)) THEN
+                     corrf_j = corrf_j + 1
+                     cycle
+                  END IF
+               END IF
+               matrix_nions(j_mat-corrf_j,i_mat-corrf_i) = matrix(j_mat,i_mat)
+            END DO
+            vector_nions(i_mat-corrf_i) = vector(i_mat)
+         END DO
+         solution_vector_nions = vector_nions
+
+         call ec_LUDCMP(matrix_nions,index_nions,indic)
+         if (error) RETURN
+         call ec_LUBKSB(matrix_nions,index_nions,solution_vector_nions)
+         if (error) RETURN
+
+         corrf_i = 0
+         DO i_mat = 1, lens
+            IF (i_mat <= N_gas) THEN
+               IF (reac_ion(i_mat)) THEN
+                  corrf_i = corrf_i + 1
+                  cycle
+               END IF
+            END IF
+            solution_vector(i_mat) = solution_vector_nions(i_mat-corrf_i)
+         END DO
+      ELSE
+         call ec_LUDCMP(matrix,index,indic)
+         if (error) RETURN
+         call ec_LUBKSB(matrix,index,solution_vector)
+         if (error) RETURN
+      END IF
+
+   end subroutine ec_INVERT_MATRIX_LONG
+
+   !> LU decomposition, from numerical recipes
+   subroutine ec_LUDCMP(a,indx,d)
+      use data_block, only: error, err_msg
+      implicit none
+      double precision, intent(inout)  :: a(:,:)
+      integer, intent(out)             :: indx(:)
+      double precision, intent(out)    :: d
+
+      double precision                 :: vv(size(a,1))
+      double precision, parameter      :: TINY = 1.0e-20
+      integer                          :: j, n, imax
+
+      n = lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUDCMP')
       if (error) RETURN
-   END IF
 
-end subroutine ec_INVERT_MATRIX_LONG
-
-!> LU decomposition, from numerical recipes
-subroutine ec_LUDCMP(a,indx,d)
-   use data_block, only: error, err_msg
-   implicit none
-   double precision, intent(inout)  :: a(:,:)
-   integer, intent(out)             :: indx(:)
-   double precision, intent(out)    :: d
-
-   double precision                 :: vv(size(a,1))
-   double precision, parameter      :: TINY = 1.0e-20
-   integer                          :: j, n, imax, lu_asserteq
-
-   n = lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUDCMP')
-   if (error) RETURN
-
-   d = 1.0
-   vv = maxval(abs(a),dim=2)
-   if (any(vv == 0.0)) then
-      error = .true.
-      err_msg = "ERROR: singular matrix in LUDCMP"
-      RETURN
-   end if
-   vv = 1.0/vv
-   do j = 1,n
-      imax = (j-1)+maxloc(vv(j:n)*abs(a(j:n,j)), dim=1)
-      if (j /= imax) then
-         call lu_swap(n,a(imax,:),a(j,:))
-         d = -d
-         vv(imax) = vv(j)
+      d = 1.0
+      vv = maxval(abs(a),dim=2)
+      if (any(vv == 0.0)) then
+         error = .true.
+         err_msg = "ERROR: singular matrix in LUDCMP"
+         RETURN
       end if
-      indx(j) = imax
-      if (a(j,j) == 0.0) a(j,j) = TINY
-      a(j+1:n,j) = a(j+1:n,j) / a(j,j)
-      ! a(j+1:n,j+1:n) = a(j+1:n,j+1:n)-lu_outerprod(n-j,a(j+1:n,j),n-j,a(j,j+1:n))
-      a(j+1:n,j+1:n) = a(j+1:n,j+1:n) - &
-      (spread(a(j+1:n,j), dim=2, ncopies=n-j) * spread(a(j,j+1:n), dim=1, ncopies=n-j))
-   end do
-END SUBROUTINE ec_LUDCMP
+      vv = 1.0/vv
+      do j = 1,n
+         imax = (j-1)+maxloc(vv(j:n)*abs(a(j:n,j)), dim=1)
+         if (j /= imax) then
+            call lu_swap(n,a(imax,:),a(j,:))
+            d = -d
+            vv(imax) = vv(j)
+         end if
+         indx(j) = imax
+         if (a(j,j) == 0.0) a(j,j) = TINY
+         a(j+1:n,j) = a(j+1:n,j) / a(j,j)
+         ! a(j+1:n,j+1:n) = a(j+1:n,j+1:n)-lu_outerprod(n-j,a(j+1:n,j),n-j,a(j,j+1:n))
+         a(j+1:n,j+1:n) = a(j+1:n,j+1:n) - &
+         (spread(a(j+1:n,j), dim=2, ncopies=n-j) * spread(a(j,j+1:n), dim=1, ncopies=n-j))
+      end do
+   END SUBROUTINE ec_LUDCMP
 
-!> LU back substitution
-SUBROUTINE ec_LUBKSB(a,indx,b)
-   use data_block, only: error
-   implicit none
-   double precision, intent(in) :: a(:,:)
-   integer, intent(in) :: indx(:)
-   double precision, intent(inout) :: b(:)
-   integer :: i,n,ii,ll, lu_asserteq
-   double precision :: summ
+   !> LU back substitution
+   SUBROUTINE ec_LUBKSB(a,indx,b)
+      use data_block, only: error
+      implicit none
+      double precision, intent(in) :: a(:,:)
+      integer, intent(in) :: indx(:)
+      double precision, intent(inout) :: b(:)
+      integer :: i,n,ii,ll
+      double precision :: summ
 
-   n=lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUBKSB')
-   if (error) RETURN
+      n=lu_asserteq(size(a,1),size(a,2),size(indx),'ec_LUBKSB')
+      if (error) RETURN
 
-   ii=0
-   do i=1,n
-      ll=indx(i)
-      summ=b(ll)
-      b(ll)=b(i)
-      if (ii /= 0) then
-         summ=summ-dot_product(a(i,ii:i-1),b(ii:i-1))
-      else if (summ /= 0.0) then
-         ii=i
+      ii=0
+      do i=1,n
+         ll=indx(i)
+         summ=b(ll)
+         b(ll)=b(i)
+         if (ii /= 0) then
+            summ=summ-dot_product(a(i,ii:i-1),b(ii:i-1))
+         else if (summ /= 0.0) then
+            ii=i
+         end if
+         b(i)=summ
+      end do
+      do i=n,1,-1
+         b(i) = (b(i)-dot_product(a(i,i+1:n),b(i+1:n)))/a(i,i)
+      end do
+   END SUBROUTINE ec_LUBKSB
+
+   subroutine lu_swap(len,arr1,arr2)
+      implicit none
+      integer, intent(in)              :: len
+      double precision, intent(inout)  :: arr1(len), arr2(len)
+      double precision                 :: tamp(len)
+
+      tamp = arr1
+      arr1 = arr2
+      arr2 = tamp
+   end subroutine lu_swap
+
+   function lu_asserteq(n1,n2,n3,label) result(m)
+      use data_block, only: error, err_msg
+      implicit none
+      integer, intent(in)        :: n1, n2, n3
+      character(len=9), intent(in)   :: label
+      integer                    :: m
+
+      if (n1==n2 .and. n2==n3) then
+         m = n1
+      else
+         error = .true.
+         err_msg = 'ERROR in '//trim(adjustl(label))//": the sizes of the matrix' don't add up..."
+         ! print *, 'nrerror: assert_eq failed in: ', label
+         ! STOP 'Program terminated by lu_asserteq'
+         RETURN
       end if
-      b(i)=summ
-   end do
-   do i=n,1,-1
-      b(i) = (b(i)-dot_product(a(i,i+1:n),b(i+1:n)))/a(i,i)
-   end do
-END SUBROUTINE ec_LUBKSB
+   end function lu_asserteq
 
-subroutine lu_swap(len,arr1,arr2)
-   implicit none
-   integer, intent(in)              :: len
-   double precision, intent(inout)  :: arr1(len), arr2(len)
-   double precision                 :: tamp(len)
-
-   tamp = arr1
-   arr1 = arr2
-   arr2 = tamp
-end subroutine lu_swap
-
-function lu_asserteq(n1,n2,n3,label) result(m)
-   use data_block, only: error, err_msg
-   implicit none
-   integer, intent(in)        :: n1, n2, n3
-   character(len=9), intent(in)   :: label
-   integer                    :: m
-
-   if (n1==n2 .and. n2==n3) then
-      m = n1
-   else
-      error = .true.
-      err_msg = 'ERROR in '//trim(adjustl(label))//": the sizes of the matrix' don't add up..."
-      ! print *, 'nrerror: assert_eq failed in: ', label
-      ! STOP 'Program terminated by lu_asserteq'
-      RETURN
-   end if
-end function lu_asserteq
-
-! function lu_outerprod(len1,arr1,len2,arr2) result(arr3)
-!    implicit none
-!    integer, intent(in)           :: len1, len2
-!    double precision, intent(in)  :: arr1(len1), arr2(len2)
-!    double precision              :: arr3(len1, len2)
-
-!    arr3 = spread(arr1, dim=2, ncopies=len2) * spread(arr2, dim=1, ncopies=len1)
-! end function lu_outerprod
+end module
