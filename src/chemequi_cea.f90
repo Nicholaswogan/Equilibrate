@@ -1,7 +1,10 @@
 
 module chemequi_cea
-   use chemequi_const, only: dp
+   use chemequi_const, only: dp, atom_str_len, reac_str_len
    implicit none
+   private
+
+   public :: CEAData
 
    type :: CEAData
       
@@ -12,15 +15,15 @@ module chemequi_cea
       character(len=500)   :: err_msg
 
       ! List of atoms
-      character(len=2), allocatable   :: names_atoms(:)  !(N_atoms)
+      character(len=atom_str_len), allocatable   :: names_atoms(:)  !(N_atoms)
       integer, allocatable            :: id_atoms(:)  !(N_atoms)
 
       ! List of reactants reordered with condensates at the end
-      character(len=15), allocatable  :: names_reactants(:), names_reactants_orig(:)  !(N_reac)
+      character(len=reac_str_len), allocatable  :: names_reactants(:), names_reactants_orig(:)  !(N_reac)
       integer, allocatable            :: id_reactants(:,:)  !(N_reac,2)
 
       ! Atomic data for each reactant
-      character(len=2), allocatable   :: reac_atoms_names(:,:)  !(5,N_reac)
+      character(len=atom_str_len), allocatable   :: reac_atoms_names(:,:)  !(5,N_reac)
       integer, allocatable            :: reac_atoms_id(:,:)  !(5,N_reac)
       real(dp), allocatable   :: reac_stoich(:,:)  !(5,N_reac)
 
@@ -37,41 +40,11 @@ module chemequi_cea
       real(dp), allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
       real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
       real(dp), allocatable   :: mol_weight(:)  !(N_reac)
-
+   
+   contains
+      procedure :: set_data
+      procedure :: easychem
    end type
-
-   !> Run variables
-   ! integer     :: iter_max
-   ! integer     :: N_atoms, N_reactants, N_gas, N_cond, N_ions
-   ! logical     :: verbose, verbose_cond, quick, ions, remove_ions, error
-   ! character(len=500)   :: err_msg
-
-   !> List of atoms
-   ! character(len=2), allocatable   :: names_atoms(:)  !(N_atoms)
-   ! integer, allocatable            :: id_atoms(:)  !(N_atoms)
-
-   !> List of reactants reordered with condensates at the end
-   ! character(len=15), allocatable  :: names_reactants(:), names_reactants_orig(:)  !(N_reac)
-   ! integer, allocatable            :: id_reactants(:,:)  !(N_reac,2)
-
-   !> Atomic data for each reactant
-   ! character(len=2), allocatable   :: reac_atoms_names(:,:)  !(5,N_reac)
-   ! integer, allocatable            :: reac_atoms_id(:,:)  !(5,N_reac)
-   ! real(dp), allocatable   :: reac_stoich(:,:)  !(5,N_reac)
-
-   !> Nature of reactant
-   ! logical, allocatable    :: reac_condensed(:), reac_ion(:)  !(N_reac)
-
-   !> Thermodynamic data arrays
-   ! integer, parameter      :: N_coeffs = 10, N_temps = 10
-   ! integer, allocatable    :: thermo_data_n_coeffs(:,:)  !(N_temps,N_reac)
-   ! integer, allocatable    :: thermo_data_n_intervs(:)  !(N_reac)
-   ! real(dp), allocatable   :: thermo_data(:,:,:)  !(N_coeffs,N_temps,N_reac)
-   ! real(dp), allocatable   :: thermo_data_temps(:,:,:)  !(2,N_temps,N_reac)
-   ! real(dp), allocatable   :: thermo_data_T_exps(:,:,:)  !(8,N_temps,N_reac)
-   ! real(dp), allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
-   ! real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
-   ! real(dp), allocatable   :: mol_weight(:)  !(N_reac)
 
 contains
 
@@ -79,9 +52,11 @@ contains
    subroutine SET_DATA(self, N_atoms_in, N_reactants_in, atoms_char, reac_char, fpath)
       use chemequi_const, only: N_coeffs, N_temps
       class(CEAData), intent(inout) :: self
-      character, intent(in)   :: atoms_char(N_atoms_in,2), reac_char(N_reactants_in,15)
+      ! character, intent(in)   :: atoms_char(N_atoms_in,2), reac_char(N_reactants_in,15)
+      character(atom_str_len), intent(in) :: atoms_char(N_atoms_in)
+      character(reac_str_len), intent(in) :: reac_char(N_reactants_in)
       integer, intent(in)     :: N_atoms_in, N_reactants_in
-      character(len=800), intent(in) :: fpath
+      character(*), intent(in) :: fpath
 
       self%error = .false.
 
@@ -128,7 +103,8 @@ contains
       end if
 
       ! Set self%names_reactants_orig with the given list of reactants
-      call da_CH2STR(reac_char, self%names_reactants_orig)
+      ! call da_CH2STR(reac_char, self%names_reactants_orig)
+      self%names_reactants_orig = reac_char
 
       ! Set all thermodynamic data
       call da_READ_THERMO(self, fpath)
@@ -145,7 +121,8 @@ contains
          allocate(self%id_atoms(self%N_atoms))
       end if
 
-      call da_CH2STR(atoms_char, self%names_atoms(1:N_atoms_in))
+      ! call da_CH2STR(atoms_char, self%names_atoms(1:N_atoms_in))
+      self%names_atoms(1:N_atoms_in) = atoms_char
       self%names_atoms(self%N_atoms) = 'E'
 
       call da_ATOMS_ID(self)
@@ -156,19 +133,19 @@ contains
    end subroutine SET_DATA
 
    !> Convert a 2-dimensional array of characters into an array of strings ; used in SET_DATA
-   subroutine da_CH2STR(chr, str)
+   ! subroutine da_CH2STR(chr, str)
 
-      character, intent(in)                   :: chr(:,:)  ! 1 row = 1 string
-      character(len=size(chr,2)), intent(out) :: str(size(chr,1))
-      integer                                 :: i, j
+   !    character, intent(in)                   :: chr(:,:)  ! 1 row = 1 string
+   !    character(len=size(chr,2)), intent(out) :: str(size(chr,1))
+   !    integer                                 :: i, j
 
-      str = ''
-      do i = 1, size(chr,1)
-         do j = 1, size(chr,2)
-            str(i) = trim(str(i))//chr(i,j)
-         end do
-      end do
-   end subroutine da_CH2STR
+   !    str = ''
+   !    do i = 1, size(chr,1)
+   !       do j = 1, size(chr,2)
+   !          str(i) = trim(str(i))//chr(i,j)
+   !       end do
+   !    end do
+   ! end subroutine da_CH2STR
 
    !> Sets id_atoms, where the i-th cell corresponds to names_atoms(i) and contains the index of the same atom in names_atoms_save
    !> names_atoms_save(id_atoms(i)) = names_atoms(i)
@@ -177,7 +154,7 @@ contains
       class(CEAData), intent(inout) :: self
       integer           :: i_atom, i_atom_save
       logical           :: change
-      character(len=2)  :: atom_upper, atom_upper_save
+      character(len=atom_str_len)  :: atom_upper, atom_upper_save
       character(len=3)  :: num
 
       do i_atom = 1, self%N_atoms
@@ -210,7 +187,7 @@ contains
       class(CEAData), intent(inout) :: self
       integer           :: i_reac, i_atom, i_atom_save
       logical           :: change
-      character(len=2)  :: atom_upper, atom_upper_save
+      character(len=atom_str_len)  :: atom_upper, atom_upper_save
       character(len=3)  :: num
 
       do i_reac = 1, self%N_reactants
@@ -244,9 +221,9 @@ contains
    !> Read in provided file all thermodynamic data
    subroutine da_READ_THERMO(self, fpath)
       class(CEAData), intent(inout) :: self
-      character(len=800), intent(in) :: fpath
+      character(*), intent(in) :: fpath
       character(len=80)             :: file_line, file_line_up
-      character(len=15)             :: name_reac_up
+      character(len=reac_str_len)             :: name_reac_up
       integer                       :: i_reac, n_interv, i_interv, i_stoich, stoich_start, reac_found
 
       reac_found = 0

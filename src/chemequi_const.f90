@@ -3,6 +3,9 @@ module chemequi_const
   implicit none
   public
 
+  integer, parameter :: atom_str_len = 2
+  integer, parameter :: reac_str_len = 15
+
   ! Constants
   real(dp), parameter :: R = 8.3144598d0
   real(dp), parameter :: amu = 1.660538921d-24

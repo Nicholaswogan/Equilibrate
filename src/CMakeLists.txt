@@ -10,6 +10,7 @@ CPMAddPackage(
 add_library(equichem
   chemequi_const.f90
   chemequi_cea.f90
+  chemequi.f90
 )
 
 target_link_libraries(equichem
