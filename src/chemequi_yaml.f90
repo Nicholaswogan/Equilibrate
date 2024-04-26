@@ -3,7 +3,7 @@ module chemequi_yaml
   implicit none
   private
 
-  public :: ReactantList, ShomatePolynomial, Nasa9Polynomial
+  public :: ReactantList, ShomatePolynomial, Nasa9Polynomial, check_for_duplicates
 
   enum, bind(c)
   enumerator :: &
@@ -175,6 +175,21 @@ contains
       j = j + 1
       item => item%next
     enddo
+
+    ! Check that at least one species has every atom
+    block
+      integer, allocatable :: composition(:)
+      allocate(composition(sp%natoms))
+      composition = 0
+      do i = 1,sp%nr
+        composition = composition + abs(sp%r(i)%composition)
+      enddo
+      ind = findloc(composition, 0, 1)
+      if (ind /= 0) then
+        err = 'Atom '//trim(sp%atoms_names(ind))//' is not in any species'
+        return
+      endif
+    end block
     
     ! check for duplicates
     block

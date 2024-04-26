@@ -50,16 +50,133 @@ module chemequi_cea
 contains
 
    !> INITIALIZE ALL DATA
-   subroutine SET_DATA(self, N_atoms_in, N_reactants_in, atoms_char, reac_char, fpath)
+   subroutine SET_DATA(self, fpath, atoms_names, reactants_names)
       use chemequi_const, only: N_coeffs, N_temps
+      use chemequi_yaml, only: check_for_duplicates, ReactantList
       class(CEAData), intent(inout) :: self
-      ! character, intent(in)   :: atoms_char(N_atoms_in,2), reac_char(N_reactants_in,15)
-      character(atom_str_len), intent(in) :: atoms_char(N_atoms_in)
-      character(reac_str_len), intent(in) :: reac_char(N_reactants_in)
-      integer, intent(in)     :: N_atoms_in, N_reactants_in
       character(*), intent(in) :: fpath
+      character(atom_str_len), optional, intent(in) :: atoms_names(:)
+      character(reac_str_len), optional, intent(in) :: reactants_names(:)
+
+      type(ReactantList) :: rl
+      character(:), allocatable :: err
+      integer :: N_atoms_in, N_reactants_in
+      character(atom_str_len), allocatable :: atoms_names_(:)
+      character(reac_str_len), allocatable :: reactants_names_(:)
+      character(atom_str_len) :: atom_tmp 
+      character(reac_str_len) :: reactant_tmp
+      integer :: ind, i, j
+      logical :: keep, found
 
       self%error = .false.
+
+      if (file_extension(fpath) == 'yaml') then
+         ! We parse the yaml file
+         rl = ReactantList(fpath, err)
+         if (allocated(err)) then
+            self%error = .true.
+            self%err_msg = err
+            return
+         endif
+      endif
+
+      if (.not.present(atoms_names) .or. .not.present(reactants_names)) then
+         if (.not.(file_extension(fpath) == 'yaml')) then
+            self%error = .true.
+            self%err_msg = 'The thermo file must be a yaml file, if you do not include '// &
+                           'a list of reactants or atoms.'
+            return
+         endif
+      endif
+
+      ! 4 cases to consider
+      if (present(atoms_names) .and. present(reactants_names)) then
+         atoms_names_ = atoms_names
+         reactants_names_ = reactants_names 
+      elseif (present(atoms_names) .and. .not.present(reactants_names)) then
+         atoms_names_ = atoms_names
+
+         ! Make sure that input atoms are in yaml file
+         do i = 1,size(atoms_names_)
+            ind = findloc(rl%atoms_names, atoms_names_(i), 1)
+            if (ind == 0) then
+               self%error = .true.
+               self%err_msg = 'Input atom '//trim(atoms_names_(i))//' is not in '//trim(fpath)
+               return
+            endif
+         enddo
+
+         ! Determine reactants from Yaml file
+         allocate(reactants_names_(1))
+         do i = 1,rl%nr
+            keep = .true.
+            do j = 1,rl%natoms
+               if (rl%r(i)%composition(j) /= 0) then
+                  ind = findloc(atoms_names_, rl%atoms_names(j), 1)
+                  if (ind == 0) then
+                     keep = .false.
+                     exit
+                  endif
+               endif
+            enddo
+            if (keep) then
+               reactant_tmp = rl%r(i)%name
+               reactants_names_ = [reactants_names_, reactant_tmp]
+            endif
+         enddo
+         reactants_names_ = reactants_names_(2:size(reactants_names_))
+
+      elseif (.not.present(atoms_names) .and. present(reactants_names)) then; block
+         integer, allocatable :: composition(:)
+         reactants_names_ = reactants_names
+
+         allocate(composition(rl%natoms))
+         composition = 0
+         do i = 1,size(reactants_names_)
+            found = .false.
+            do j = 1,rl%nr
+               if (trim(reactants_names_(i)) == trim(rl%r(j)%name)) then
+                  found = .true.
+                  composition = composition + abs(rl%r(j)%composition)
+                  exit
+               endif
+            enddo
+            if (.not.found) then
+               self%error = .true.
+               self%err_msg = 'Input reactant '//trim(reactants_names_(i))//' is not in '//trim(fpath)
+               return
+            endif
+         enddo
+         allocate(atoms_names_(1))
+         do i = 1,size(composition)
+            if (composition(i) /= 0 .and. trim(rl%atoms_names(i)) /= 'E') then
+               atom_tmp = rl%atoms_names(i)
+               atoms_names_ = [atoms_names_, atom_tmp]
+            endif
+         enddo
+         atoms_names_ = atoms_names_(2:size(atoms_names_))
+
+      endblock; elseif (.not.present(atoms_names) .and. .not.present(reactants_names)) then
+
+         allocate(reactants_names_(1))
+         do i = 1,rl%nr
+            reactant_tmp = rl%r(i)%name
+            reactants_names_ = [reactants_names_, reactant_tmp]
+         enddo
+         reactants_names_ = reactants_names_(2:size(reactants_names_))
+         allocate(atoms_names_(1))
+         do i = 1,rl%natoms
+            if (trim(rl%atoms_names(i)) /= 'E') then
+               atom_tmp = rl%atoms_names(i)
+               atoms_names_ = [atoms_names_, atom_tmp]
+            endif
+         enddo
+         atoms_names_ = atoms_names_(2:size(atoms_names_))
+         
+      endif
+
+      N_atoms_in = size(atoms_names_)
+      N_reactants_in = size(reactants_names_)
 
       ! REACTANTS
       if (N_reactants_in /= self%N_reactants .and. allocated(self%names_reactants_orig)) then
@@ -107,11 +224,18 @@ contains
 
       ! Set self%names_reactants_orig with the given list of reactants
       ! call da_CH2STR(reac_char, self%names_reactants_orig)
-      self%names_reactants_orig = reac_char
+      self%names_reactants_orig = reactants_names_
+      ! check for duplicates
+      ind = check_for_duplicates(self%names_reactants_orig)
+      if (ind /= 0) then
+         self%error = .true.
+         self%err_msg = '"'//trim(self%names_reactants_orig(ind))//'" is a duplicate reactant input.'
+         return
+      endif
 
       if (file_extension(fpath) == 'yaml') then
 
-      call read_thermo_yaml(self, fpath)
+      call read_thermo_yaml(self, rl, fpath)
       if (self%error) return
 
       else
@@ -134,8 +258,16 @@ contains
       end if
 
       ! call da_CH2STR(atoms_char, self%names_atoms(1:N_atoms_in))
-      self%names_atoms(1:N_atoms_in) = atoms_char
+      self%names_atoms(1:N_atoms_in) = atoms_names_
       self%names_atoms(self%N_atoms) = 'E'
+      ! check for duplicates
+      ind = check_for_duplicates(self%names_atoms)
+      if (ind /= 0) then
+         self%error = .true.
+         self%err_msg = '"'//trim(self%names_atoms(ind))//'" is a duplicate atom input. '// &
+         'Note that "E" should not be an atom input.'
+         return
+      endif
 
       call da_ATOMS_ID(self)
       if (self%error) RETURN
@@ -144,30 +276,21 @@ contains
 
    end subroutine SET_DATA
 
-   subroutine read_thermo_yaml(self, fpath)
+   subroutine read_thermo_yaml(self, rl, fpath)
       use chemequi_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial
       class(CEAData), intent(inout) :: self
+      type(ReactantList), intent(in) :: rl
       character(*), intent(in) :: fpath
 
-      character(:), allocatable :: err
-      type(ReactantList) :: rl
       character(len=reac_str_len) :: name1, name2
       logical :: found
       integer :: i, j, k, kk
-
-      rl = ReactantList(fpath, err)
-      if (allocated(err)) then
-         self%error = .true.
-         self%err_msg = err
-         return
-      endif
 
       ! Not set and not used in code later
       self%form_heat_Jmol_298_15_K = 0.0_dp
       self%thermo_data_n_coeffs = 0
       self%thermo_data_T_exps = 0.0_dp
       self%H_0_298_15_K_m_H_0_0_K = 0.0_dp
-
 
       self%N_gas = 0
       ! first loop sets self%N_gas and self%reac_condensed
