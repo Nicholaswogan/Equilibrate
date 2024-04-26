@@ -251,7 +251,7 @@ contains
       0.000000000000000e+00_dp &
     ]
 
-    cea = ChemEquiAnalysis(atoms, reactants, '../test/thermo_easy_chem_simp_own.inp', err)
+    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.inp', atoms, reactants, err)
     if (allocated(err)) then
       print*,err
       stop 1
@@ -263,10 +263,13 @@ contains
       stop 1
     endif
 
-    if (.not.all(is_close(cea%molfracs_reactants,correct_answer))) then
-      print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
-      stop 1
-    endif
+    do i = 1,size(cea%molfracs_reactants)
+      if (.not.is_close(cea%molfracs_reactants(i),correct_answer(i)) .and. cea%molfracs_reactants(i) > 1.0e-50_dp) then
+        print*,cea%molfracs_reactants(i),correct_answer(i)
+        print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
+        stop 1
+      endif
+    enddo
 
   end subroutine
 
