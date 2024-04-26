@@ -11,7 +11,8 @@ module chemequi_cea
       real(dp) :: mass_tol = 1.0e-2_dp !! Degree to which mass will be balanced. 
                                        !! Gordon & McBride's default is 1.0e-6, but
                                        !! this seems too strict.
-      
+      logical :: verbose2 !! actual verbosity variable
+
       ! Run variables
       integer     :: iter_max
       integer     :: N_atoms = 0, N_reactants = 0, N_gas = 0, N_cond = 0, N_ions = 0
@@ -675,13 +676,14 @@ contains
    end subroutine da_REORDER_SPECS
 
    !> MAIN SUBROUTINE
-   subroutine EASYCHEM(self,mode,verbo,N_atoms_in,N_reactants_in,molfracs_atoms, &
+   subroutine EASYCHEM(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms, &
       molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
 
       !! I/O:
       class(CEAData), intent(inout) :: self
       character, intent(in)            :: mode
       character(len=2), intent(in)     :: verbo
+      logical, intent(in) :: verbose2
       real(dp), intent(in)     :: molfracs_atoms(N_atoms_in)
       real(dp), intent(out)    :: molfracs_reactants(N_reactants_in), massfracs_reactants(N_reactants_in)
       integer, intent(in)              :: N_atoms_in, N_reactants_in
@@ -691,7 +693,7 @@ contains
       !! Internal:
       real(dp)                 :: C_P_0(self%N_reactants), H_0(self%N_reactants), S_0(self%N_reactants)
       real(dp)                 :: molfracs_atoms_ions(N_atoms_in+1), temp_use
-      integer                          :: N_atoms_use, gamma_neg_try
+      integer                          :: N_atoms_use
 
       self%error = .false.
 
@@ -703,6 +705,7 @@ contains
 
       self%verbose = .FALSE.
       self%verbose_cond = (verbo == 'vy')
+      self%verbose2 = verbose2
       self%quick = (mode /= 's')
       self%remove_ions = .FALSE.
 
@@ -728,25 +731,11 @@ contains
       call ec_COMP_THERMO_QUANTS(self,temp,self%N_reactants,C_P_0, H_0, S_0)
       gamma2 = 0d0
       temp_use = temp
-      gamma_neg_try = 0d0
-      do while (gamma2 < 1d0)
-         call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
-         molfracs_reactants, massfracs_reactants, &
-         temp_use, press, C_P_0, H_0, S_0, &
-         nabla_ad, gamma2, MMW, rho, c_pe)
-         if (self%error) RETURN
-
-         if (gamma2 < 1d0) then
-            write(*,*) 'Gamma was < 1, redo! gamma2, temp, ', gamma2, temp
-            gamma_neg_try = gamma_neg_try + 1
-            if (gamma_neg_try > 10) then
-               call random_number(temp_use)
-               temp_use = temp*(1d0 + 0.01d0*temp_use)
-               write(*,*) 'temp, temp_use', temp, temp_use
-               call ec_COMP_THERMO_QUANTS(self,temp_use,self%N_reactants,C_P_0, H_0, S_0)
-            end if
-         end if
-      end do
+      call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
+      molfracs_reactants, massfracs_reactants, &
+      temp_use, press, C_P_0, H_0, S_0, &
+      nabla_ad, gamma2, MMW, rho, c_pe)
+      if (self%error) RETURN
 
       c_pe = c_pe*1d7 ! J/(g K) to erg/(g K)
 
@@ -944,8 +933,9 @@ contains
       END DO
 
       IF (.NOT. converged) THEN
-         WRITE(*,*) 'EASY CHEM WARNING: One or more convergence criteria not satisfied! Press, temp', press, temp
-         print *
+         self%error = .true.
+         self%err_msg = 'One or more convergence criteria not satisfied (gas only).'
+         return
       END IF
 
       converged = .FALSE.
@@ -994,6 +984,8 @@ contains
                   solid_indices(current_solids_number) = inc_next
                   solid_inclu(inc_next-self%N_gas) = .TRUE.
                   call ec_INIT_COND_VALS(self,N_atoms_use, self%N_reactants, molfracs_atoms, inc_next, n_spec)
+                  if (self%error) return
+                  
                   if (self%verbose_cond) then
                      print *, '+   ', self%names_reactants(inc_next), dgdnj(inc_next-self%N_gas), n_spec(inc_next)
                   end if
@@ -1065,20 +1057,21 @@ contains
                IF (.NOT. converged) THEN
                   IF (self%quick) THEN
                      self%quick = .FALSE.
-                     print *
-                     print *, 'SLOW ! Press, Temp', press, temp
-                     print *
+                     if (self%verbose2) then
+                        print*,'SLOW!'
+                     endif
                      call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants, molfracs_atoms, &
                      molfracs_reactants, massfracs_reactants, &
                      temp, press, C_P_0, H_0, S_0, &
                      nabla_ad,gamma2,MMW,rho,c_pe)
+                     if (self%error) return
                      self%quick = .TRUE.
                      slowed = .TRUE.
                      EXIT
                   ELSE
-                     WRITE(*,*) 'EASY CHEM WARNING: One or more convergence criteria' // &
-                                             'not satisfied! in cond Press, temp', press, temp
-                     print *
+                     self%error = .true.
+                     self%err_msg = 'One or more convergence criteria not satisfied (gas & condensates).'
+                     return
                   END IF
                END IF
 
@@ -1291,7 +1284,9 @@ contains
       if (min_molfrac >= 0) then
          n_spec(i_cond) = min_molfrac
       else
-         print *, 'ERROR: no data found for the atoms of the given condensate'
+         self%error = .true.
+         self%err_msg = 'No data found for the atoms of the given condensate.'
+         return
       end if
 
    end subroutine ec_INIT_COND_VALS

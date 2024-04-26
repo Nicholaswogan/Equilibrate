@@ -23,6 +23,8 @@ module chemequi
 
     real(dp) :: nabla_ad, gamma2, MMW, rho, c_pe
 
+    logical :: verbose = .false.
+
     !> driver routines
     type(CEAData), allocatable :: dat
 
@@ -130,7 +132,7 @@ contains
     ! normalize
     X_ = X/sum(X)
 
-    call self%dat%easychem(mode='q', verbo='  ', N_atoms_in=size(self%atoms_names), &
+    call self%dat%easychem(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
                            N_reactants_in=size(self%species_names), molfracs_atoms=X_, &
                            molfracs_reactants=self%mole_fractions, &
                            massfracs_reactants=self%mass_fractions, &
