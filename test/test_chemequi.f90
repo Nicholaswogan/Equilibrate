@@ -9,13 +9,13 @@ contains
   subroutine test()
     type(ChemEquiAnalysis) :: cea
     character(:), allocatable :: err
-    character(reac_str_len), allocatable :: reactants(:)
+    character(reac_str_len), allocatable :: species(:)
     character(atom_str_len), allocatable :: atoms(:)
     real(dp), allocatable :: X(:), correct_answer(:)
 
     integer :: i
 
-    reactants = [ &
+    species = [ &
       'H              ', &
       'H2             ', &
       'He             ', &
@@ -251,7 +251,7 @@ contains
       0.000000000000000e+00_dp &
     ]
 
-    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.inp', atoms, reactants, err)
+    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.inp', atoms, species, err)
     if (allocated(err)) then
       print*,err
       stop 1
@@ -263,9 +263,9 @@ contains
       stop 1
     endif
 
-    do i = 1,size(cea%molfracs_reactants)
-      if (.not.is_close(cea%molfracs_reactants(i),correct_answer(i)) .and. cea%molfracs_reactants(i) > 1.0e-50_dp) then
-        print*,cea%molfracs_reactants(i),correct_answer(i)
+    do i = 1,size(cea%mole_fractions)
+      if (.not.is_close(cea%mole_fractions(i),correct_answer(i)) .and. cea%mole_fractions(i) > 1.0e-50_dp) then
+        print*,cea%mole_fractions(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
       endif
