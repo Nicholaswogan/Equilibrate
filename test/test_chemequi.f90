@@ -7,12 +7,11 @@ program main
 contains
 
   subroutine test()
-    type(ChemEquiAnalysis) :: cea
+    type(ChemEquiAnalysis) :: cea, cea2
     character(:), allocatable :: err
     character(reac_str_len), allocatable :: species(:)
     character(atom_str_len), allocatable :: atoms(:)
     real(dp), allocatable :: X(:), correct_answer(:)
-
     integer :: i
 
     species = [ &
@@ -251,7 +250,13 @@ contains
       0.000000000000000e+00_dp &
     ]
 
-    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.inp', atoms, species, err)
+    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.yaml', atoms, species, err)
+    if (allocated(err)) then
+      print*,err
+      stop 1
+    endif
+
+    cea2 = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.inp', atoms, species, err)
     if (allocated(err)) then
       print*,err
       stop 1
@@ -263,9 +268,23 @@ contains
       stop 1
     endif
 
+    call cea2%solve(1.0_dp, 1000.0_dp, X, err)
+    if (allocated(err)) then
+      print*,err
+      stop 1
+    endif
+
     do i = 1,size(cea%mole_fractions)
       if (.not.is_close(cea%mole_fractions(i),correct_answer(i)) .and. cea%mole_fractions(i) > 1.0e-50_dp) then
         print*,cea%mole_fractions(i),correct_answer(i)
+        print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
+        stop 1
+      endif
+    enddo
+
+    do i = 1,size(cea2%mole_fractions)
+      if (.not.is_close(cea2%mole_fractions(i),correct_answer(i)) .and. cea2%mole_fractions(i) > 1.0e-50_dp) then
+        print*,cea2%mole_fractions(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
       endif
