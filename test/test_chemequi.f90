@@ -290,6 +290,8 @@ contains
       endif
     enddo
 
+    print*,'test passed.'
+
   end subroutine
 
   !> coppied from fortran stdlib v0.2.0
