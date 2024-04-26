@@ -388,8 +388,8 @@ contains
                      self%thermo_data(1:7,k,i) = rl%r(j)%thermo%data(:,k)
                   elseif (rl%r(j)%thermo%dtype == Nasa9Polynomial) then
                      self%thermo_data(1:9,k,i) = rl%r(j)%thermo%data(:,k)
-                     self%thermo_data(10,k,i) = self%thermo_data(9,k,i) 
-                     self%thermo_data(9,k,i) = 0.0_dp
+                     self%thermo_data(9:10,k,i) = self%thermo_data(8:9,k,i) 
+                     self%thermo_data(8,k,i) = 0.0_dp
                   endif
                enddo
 
