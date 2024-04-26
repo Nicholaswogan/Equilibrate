@@ -1,6 +1,6 @@
 
-module chemequi_cea
-   use chemequi_const, only: dp, atom_str_len, reac_str_len
+module equilibrate_cea
+   use equilibrate_const, only: dp, atom_str_len, reac_str_len
    implicit none
    private
 
@@ -56,8 +56,8 @@ contains
 
    !> INITIALIZE ALL DATA
    subroutine SET_DATA(self, fpath, atoms_names, reactants_names)
-      use chemequi_const, only: N_coeffs, N_temps
-      use chemequi_yaml, only: check_for_duplicates, ReactantList
+      use equilibrate_const, only: N_coeffs, N_temps
+      use equilibrate_yaml, only: check_for_duplicates, ReactantList
       class(CEAData), intent(inout) :: self
       character(*), intent(in) :: fpath
       character(atom_str_len), optional, intent(in) :: atoms_names(:)
@@ -282,7 +282,7 @@ contains
    end subroutine SET_DATA
 
    subroutine read_thermo_yaml(self, rl, fpath)
-      use chemequi_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial
+      use equilibrate_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial
       class(CEAData), intent(inout) :: self
       type(ReactantList), intent(in) :: rl
       character(*), intent(in) :: fpath
@@ -437,7 +437,7 @@ contains
    !> Sets id_atoms, where the i-th cell corresponds to names_atoms(i) and contains the index of the same atom in names_atoms_save
    !> names_atoms_save(id_atoms(i)) = names_atoms(i)
    subroutine da_ATOMS_ID(self)
-      use chemequi_const, only: N_atoms_save, names_atoms_save
+      use equilibrate_const, only: N_atoms_save, names_atoms_save
       class(CEAData), intent(inout) :: self
       integer           :: i_atom, i_atom_save
       logical           :: change
@@ -470,7 +470,7 @@ contains
    end subroutine da_ATOMS_ID
 
    subroutine da_REAC_ATOMS_ID(self)
-      use chemequi_const, only: N_atoms_save, names_atoms_save
+      use equilibrate_const, only: N_atoms_save, names_atoms_save
       class(CEAData), intent(inout) :: self
       integer           :: i_reac, i_atom, i_atom_save
       logical           :: change
@@ -507,7 +507,7 @@ contains
 
    !> Read in provided file all thermodynamic data
    subroutine da_READ_THERMO(self, fpath)
-      use chemequi_yaml, only: Nasa9Polynomial
+      use equilibrate_yaml, only: Nasa9Polynomial
       class(CEAData), intent(inout) :: self
       character(*), intent(in) :: fpath
       character(len=80)             :: file_line, file_line_up
@@ -743,8 +743,8 @@ contains
 
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(self,temp,N_reac,C_P_0, H_0, S_0)
-      use chemequi_const, only: R
-      use chemequi_yaml, only: ShomatePolynomial, Nasa9Polynomial
+      use equilibrate_const, only: R
+      use equilibrate_yaml, only: ShomatePolynomial, Nasa9Polynomial
       !! I/O
       class(CEAData), intent(inout) :: self
       real(dp), intent(in)  :: temp
@@ -849,7 +849,7 @@ contains
    recursive subroutine ec_COMP_EQU_CHEM(self, N_atoms_use, N_reac, molfracs_atoms, &
       molfracs_reactants, massfracs_reactants, &
       temp, press, C_P_0, H_0, S_0, nabla_ad, gamma2, MMW, rho, c_pe)
-      use chemequi_const, only: amu, kB, masses_atoms_save
+      use equilibrate_const, only: amu, kB, masses_atoms_save
 
       !! I/O:
       class(CEAData), intent(inout) :: self
@@ -1175,7 +1175,7 @@ contains
    !> Selects which solid to include next
    subroutine ec_INCLUDE_WHICH_SOLID(self,N_atoms_use,N_reac,pi_atom,H_0,S_0,temp, &
       n_spec,solid_inclu,neg_cond,dgdnj,remove_cond,inc_next)
-      use chemequi_const, only: mol, R
+      use equilibrate_const, only: mol, R
       !! I/O
       class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use, N_reac
@@ -1294,7 +1294,7 @@ contains
    !> Build the small matrix
    subroutine ec_PREP_MATRIX_SHORT(self,N_atoms_use, N_reac, molfracs_atoms, N_species, press, temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids, mu_gas, a_gas)
-      use chemequi_const, only: mol, R
+      use equilibrate_const, only: mol, R
       !! I/O:
       class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
@@ -1506,7 +1506,7 @@ contains
    !> Return the result of one step of computation with small matrix(problem: AX=B)
    subroutine ec_UPDATE_ABUNDS_SHORT(self,N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,mu_gas,a_gas,temp,molfracs_atoms,n_spec_old)
-      use chemequi_const, only: mol, R
+      use equilibrate_const, only: mol, R
       !! I/O:
       class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
@@ -1761,7 +1761,7 @@ contains
    !> Build the big matrix
    subroutine ec_PREP_MATRIX_LONG(self,N_atoms_use, N_reac, molfracs_atoms, N_species,press,temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids)
-      use chemequi_const, only: mol, R
+      use equilibrate_const, only: mol, R
       !! I/O:
       class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
@@ -1947,7 +1947,7 @@ contains
    !> Return the result of one step of computation with big matrix(problem: AX=B)
    subroutine ec_UPDATE_ABUNDS_LONG(self,N_atoms_use,N_reac,N_species,solution_vector,n_spec,pi_atom,&
    n,converged,solid_indices,N_solids,molfracs_atoms,n_spec_old)
-      use chemequi_const, only: mol
+      use equilibrate_const, only: mol
       !! I/O:
       class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
@@ -2191,7 +2191,7 @@ contains
    !> Computes the adiabatic gradient
    subroutine ec_COMP_ADIABATIC_GRAD(self,N_atoms_use,N_reac,N_spec_eff,n_spec, &
    n,H_0,C_P_0,solid_indices,N_solids,temp,nabla_ad,gamma2,c_pe)
-      use chemequi_const, only: mol, R
+      use equilibrate_const, only: mol, R
 
       !! I/O:
       class(CEAData), intent(inout) :: self
@@ -2339,7 +2339,7 @@ contains
    end subroutine ec_COMP_ADIABATIC_GRAD
 
    subroutine ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
-      use chemequi_const, only: masses_atoms_save
+      use equilibrate_const, only: masses_atoms_save
       class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use
       real(dp), intent(in)  :: molfracs_atoms(N_atoms_use)

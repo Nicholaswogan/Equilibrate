@@ -1,6 +1,6 @@
-module chemequi
-  use chemequi_const, only: dp, atom_str_len, reac_str_len
-  use chemequi_cea, only: CEAData
+module equilibrate
+  use equilibrate_const, only: dp, atom_str_len, reac_str_len
+  use equilibrate_cea, only: CEAData
   implicit none
   private
 

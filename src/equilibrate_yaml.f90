@@ -1,5 +1,5 @@
-module chemequi_yaml
-  use chemequi_const, only: dp, s_str_len
+module equilibrate_yaml
+  use equilibrate_const, only: dp, s_str_len
   implicit none
   private
 

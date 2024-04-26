@@ -1,4 +1,4 @@
-module chemequi_const
+module equilibrate_const
   use iso_fortran_env, only: dp => real64
   implicit none
   public

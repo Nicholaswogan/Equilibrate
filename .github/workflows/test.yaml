@@ -32,4 +32,4 @@ jobs:
     - name: test
       working-directory: ${{github.workspace}}/build
       run: |
-        valgrind --error-exitcode=1 --leak-check=full ./test/test_chemequi
+        valgrind --error-exitcode=1 --leak-check=full ./test/test_equilibrate

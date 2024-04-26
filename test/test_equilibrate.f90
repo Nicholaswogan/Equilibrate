@@ -1,5 +1,5 @@
 program main
-  use chemequi, only: ChemEquiAnalysis, dp, reac_str_len, atom_str_len
+  use equilibrate, only: ChemEquiAnalysis, dp, reac_str_len, atom_str_len
   implicit none
 
   call test()

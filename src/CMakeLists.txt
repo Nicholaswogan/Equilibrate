@@ -7,24 +7,24 @@ CPMAddPackage(
   EXCLUDE_FROM_ALL ON
 )
 
-add_library(equichem
-  chemequi_yaml.f90
-  chemequi_const.f90
-  chemequi_cea.f90
-  chemequi.f90
+add_library(equilibrate
+  equilibrate_yaml.f90
+  equilibrate_const.f90
+  equilibrate_cea.f90
+  equilibrate.f90
 )
 
-target_link_libraries(equichem
+target_link_libraries(equilibrate
   fortran-yaml-c
 )
 
 # This is important for making Python wrapper
-set_property(TARGET equichem PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET equilibrate PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Add special compiler flags to Clima
 if ("${CMAKE_Fortran_COMPILER_ID}" MATCHES "GNU")
-  target_compile_options(equichem PRIVATE -Wunused -Wimplicit-interface -fimplicit-none)
+  target_compile_options(equilibrate PRIVATE -Wunused -Wimplicit-interface -fimplicit-none)
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(equichem PRIVATE -fcheck=all,no-array-temps)
+    target_compile_options(equilibrate PRIVATE -fcheck=all,no-array-temps)
   endif()
 endif()
