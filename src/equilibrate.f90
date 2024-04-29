@@ -12,12 +12,17 @@ module equilibrate
     character(reac_str_len), allocatable :: gas_names(:)
     character(reac_str_len), allocatable :: condensate_names(:)
 
+    real(dp), allocatable, private :: species_composition(:,:)
+
+    real(dp), allocatable :: atom_fractions(:)
     real(dp), allocatable :: mole_fractions(:)
     real(dp), allocatable :: mass_fractions(:)
 
+    real(dp), allocatable :: atom_fractions_gas(:)
     real(dp), allocatable :: mole_fractions_gas(:)
     real(dp), allocatable :: mass_fractions_gas(:)
 
+    real(dp), allocatable :: atom_fractions_condensate(:)
     real(dp), allocatable :: mole_fractions_condensate(:)
     real(dp), allocatable :: mass_fractions_condensate(:)
 
@@ -44,7 +49,7 @@ contains
     character(:), allocatable, intent(out) :: err
     type(ChemEquiAnalysis) :: cea
 
-    integer :: i, j, jj
+    integer :: i, j, jj, k
 
     if (present(atoms)) then
       if (size(atoms) < 1) then
@@ -94,6 +99,10 @@ contains
     enddo
 
     if (allocated(cea%mole_fractions)) then
+      deallocate(cea%species_composition)
+      deallocate(cea%atom_fractions)
+      deallocate(cea%atom_fractions_gas)
+      deallocate(cea%atom_fractions_condensate)
       deallocate(cea%mole_fractions)
       deallocate(cea%mole_fractions_gas)
       deallocate(cea%mole_fractions_condensate)
@@ -101,12 +110,35 @@ contains
       deallocate(cea%mass_fractions_gas)
       deallocate(cea%mass_fractions_condensate)
     endif
+    allocate(cea%species_composition(size(cea%atoms_names),size(cea%species_names)))
+    allocate(cea%atom_fractions(size(cea%atoms_names)))
+    allocate(cea%atom_fractions_gas(size(cea%atoms_names)))
+    allocate(cea%atom_fractions_condensate(size(cea%atoms_names)))
     allocate(cea%mole_fractions(size(cea%species_names)))
     allocate(cea%mole_fractions_gas(size(cea%gas_names)))
     allocate(cea%mole_fractions_condensate(size(cea%condensate_names)))
     allocate(cea%mass_fractions(size(cea%species_names)))
     allocate(cea%mass_fractions_gas(size(cea%gas_names)))
     allocate(cea%mass_fractions_condensate(size(cea%condensate_names)))
+
+    ! Get composition of each species
+    cea%species_composition = 0.0_dp
+    do j = 1,size(cea%species_names)
+      do k = 1,size(cea%dat%reac_atoms_id,1)
+        if (cea%dat%reac_atoms_id(k,j) > 0) then
+          i = findloc(cea%dat%id_atoms, cea%dat%reac_atoms_id(k, j), 1)
+          if (i == 0 .or. i > size(cea%atoms_names) + 1) then
+            err = 'Indexing error during initialization.'
+            return
+          endif
+          if (i == size(cea%atoms_names) + 1) then
+            ! Electron so we skip
+            cycle
+          endif
+          cea%species_composition(i,j) = cea%dat%reac_stoich(k,j)
+        endif
+      enddo
+    enddo
 
   end function
 
@@ -165,6 +197,23 @@ contains
       self%mole_fractions_gas = self%mole_fractions_gas/max(sum(self%mole_fractions_gas),tiny(1.0_dp))
       self%mass_fractions_gas = self%mass_fractions_gas/max(sum(self%mass_fractions_gas),tiny(1.0_dp))
     endif
+
+    self%atom_fractions = 0.0_dp
+    self%atom_fractions_gas = 0.0_dp
+    self%atom_fractions_condensate = 0.0_dp
+    do j = 1,size(self%species_names)
+      self%atom_fractions(:) = self%atom_fractions(:) + self%species_composition(:,j)*self%mole_fractions(j)
+      if (self%dat%reac_condensed(j)) then
+        self%atom_fractions_condensate(:) = self%atom_fractions_condensate(:) &
+                                            + self%species_composition(:,j)*self%mole_fractions(j)
+      else
+        self%atom_fractions_gas(:) = self%atom_fractions_gas(:) &
+                                     + self%species_composition(:,j)*self%mole_fractions(j)
+      endif
+    enddo
+    self%atom_fractions = self%atom_fractions/max(sum(self%atom_fractions),tiny(1.0_dp))
+    self%atom_fractions_condensate = self%atom_fractions_condensate/max(sum(self%atom_fractions_condensate),tiny(1.0_dp))
+    self%atom_fractions_gas = self%atom_fractions_gas/max(sum(self%atom_fractions_gas),tiny(1.0_dp))
 
   end subroutine
 
