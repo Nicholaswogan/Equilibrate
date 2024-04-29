@@ -14,17 +14,17 @@ module equilibrate
 
     real(dp), allocatable, private :: species_composition(:,:)
 
-    real(dp), allocatable :: atom_fractions(:)
-    real(dp), allocatable :: mole_fractions(:)
-    real(dp), allocatable :: mass_fractions(:)
+    real(dp), allocatable :: molfracs_atoms(:)
+    real(dp), allocatable :: molfracs_species(:)
+    real(dp), allocatable :: massfracs_species(:)
 
-    real(dp), allocatable :: atom_fractions_gas(:)
-    real(dp), allocatable :: mole_fractions_gas(:)
-    real(dp), allocatable :: mass_fractions_gas(:)
+    real(dp), allocatable :: molfracs_atoms_gas(:)
+    real(dp), allocatable :: molfracs_species_gas(:)
+    real(dp), allocatable :: massfracs_species_gas(:)
 
-    real(dp), allocatable :: atom_fractions_condensate(:)
-    real(dp), allocatable :: mole_fractions_condensate(:)
-    real(dp), allocatable :: mass_fractions_condensate(:)
+    real(dp), allocatable :: molfracs_atoms_condensate(:)
+    real(dp), allocatable :: molfracs_species_condensate(:)
+    real(dp), allocatable :: massfracs_species_condensate(:)
 
     real(dp) :: nabla_ad, gamma2, MMW, rho, c_pe
 
@@ -98,28 +98,28 @@ contains
       endif
     enddo
 
-    if (allocated(cea%mole_fractions)) then
+    if (allocated(cea%molfracs_species)) then
       deallocate(cea%species_composition)
-      deallocate(cea%atom_fractions)
-      deallocate(cea%atom_fractions_gas)
-      deallocate(cea%atom_fractions_condensate)
-      deallocate(cea%mole_fractions)
-      deallocate(cea%mole_fractions_gas)
-      deallocate(cea%mole_fractions_condensate)
-      deallocate(cea%mass_fractions)
-      deallocate(cea%mass_fractions_gas)
-      deallocate(cea%mass_fractions_condensate)
+      deallocate(cea%molfracs_atoms)
+      deallocate(cea%molfracs_atoms_gas)
+      deallocate(cea%molfracs_atoms_condensate)
+      deallocate(cea%molfracs_species)
+      deallocate(cea%molfracs_species_gas)
+      deallocate(cea%molfracs_species_condensate)
+      deallocate(cea%massfracs_species)
+      deallocate(cea%massfracs_species_gas)
+      deallocate(cea%massfracs_species_condensate)
     endif
     allocate(cea%species_composition(size(cea%atoms_names),size(cea%species_names)))
-    allocate(cea%atom_fractions(size(cea%atoms_names)))
-    allocate(cea%atom_fractions_gas(size(cea%atoms_names)))
-    allocate(cea%atom_fractions_condensate(size(cea%atoms_names)))
-    allocate(cea%mole_fractions(size(cea%species_names)))
-    allocate(cea%mole_fractions_gas(size(cea%gas_names)))
-    allocate(cea%mole_fractions_condensate(size(cea%condensate_names)))
-    allocate(cea%mass_fractions(size(cea%species_names)))
-    allocate(cea%mass_fractions_gas(size(cea%gas_names)))
-    allocate(cea%mass_fractions_condensate(size(cea%condensate_names)))
+    allocate(cea%molfracs_atoms(size(cea%atoms_names)))
+    allocate(cea%molfracs_atoms_gas(size(cea%atoms_names)))
+    allocate(cea%molfracs_atoms_condensate(size(cea%atoms_names)))
+    allocate(cea%molfracs_species(size(cea%species_names)))
+    allocate(cea%molfracs_species_gas(size(cea%gas_names)))
+    allocate(cea%molfracs_species_condensate(size(cea%condensate_names)))
+    allocate(cea%massfracs_species(size(cea%species_names)))
+    allocate(cea%massfracs_species_gas(size(cea%gas_names)))
+    allocate(cea%massfracs_species_condensate(size(cea%condensate_names)))
 
     ! Get composition of each species
     cea%species_composition = 0.0_dp
@@ -142,63 +142,63 @@ contains
 
   end function
 
-  subroutine solve(self, P, T, atom_fractions, species_fractions, err)
+  subroutine solve(self, P, T, molfracs_atoms, molfracs_species, err)
     class(ChemEquiAnalysis), intent(inout) :: self
     real(dp), intent(in) :: P
     real(dp), intent(in) :: T
-    real(dp), optional, intent(in) :: atom_fractions(:)
-    real(dp), optional, intent(in) :: species_fractions(:)
+    real(dp), optional, intent(in) :: molfracs_atoms(:)
+    real(dp), optional, intent(in) :: molfracs_species(:)
     character(:), allocatable, intent(out) :: err
 
-    real(dp), allocatable :: atom_fractions_(:)
+    real(dp), allocatable :: molfracs_atoms_(:)
     integer :: i, j, jj
 
-    if (present(atom_fractions) .and. present(species_fractions)) then
-      err = 'Both "atom_fractions" and "species_fractions" are inputs, but only one is allowed.'
+    if (present(molfracs_atoms) .and. present(molfracs_species)) then
+      err = 'Both "molfracs_atoms" and "molfracs_species" are inputs, but only one is allowed.'
       return
     endif
-    if (.not.present(atom_fractions) .and. .not.present(species_fractions)) then
-      err = 'Neither "atom_fractions" or "species_fractions" are inputs, but one is needed.'
+    if (.not.present(molfracs_atoms) .and. .not.present(molfracs_species)) then
+      err = 'Neither "molfracs_atoms" or "molfracs_species" are inputs, but one is needed.'
       return
     endif
 
     ! Input is an array of atom mole fractions
-    if (present(atom_fractions)) then
-      if (size(atom_fractions) /= size(self%atoms_names)) then
-        err = 'Input "atom_fractions" has the wrong size'
+    if (present(molfracs_atoms)) then
+      if (size(molfracs_atoms) /= size(self%atoms_names)) then
+        err = 'Input "molfracs_atoms" has the wrong size'
         return
       endif
-      if (any(atom_fractions < 0)) then
-        err = 'Input "atom_fractions" can not be less than zero'
+      if (any(molfracs_atoms < 0)) then
+        err = 'Input "molfracs_atoms" can not be less than zero'
         return
       endif
-      atom_fractions_ = atom_fractions/max(sum(atom_fractions),tiny(1.0_dp))
+      molfracs_atoms_ = molfracs_atoms/max(sum(molfracs_atoms),tiny(1.0_dp))
     endif
 
     ! Input is an array of species mole fractions
-    if (present(species_fractions)) then
-      if (size(species_fractions) /= size(self%species_names)) then
-        err = 'Input "species_fractions" has the wrong size'
+    if (present(molfracs_species)) then
+      if (size(molfracs_species) /= size(self%species_names)) then
+        err = 'Input "molfracs_species" has the wrong size'
         return
       endif
-      if (any(species_fractions < 0)) then
-        err = 'Input "species_fractions" can not be less than zero'
+      if (any(molfracs_species < 0)) then
+        err = 'Input "molfracs_species" can not be less than zero'
         return
       endif
 
-      allocate(atom_fractions_(size(self%atoms_names)))
-      atom_fractions_ = 0.0_dp
+      allocate(molfracs_atoms_(size(self%atoms_names)))
+      molfracs_atoms_ = 0.0_dp
       do j = 1,size(self%species_names)
-        atom_fractions_(:) = atom_fractions_(:) + self%species_composition(:,j)*species_fractions(j)
+        molfracs_atoms_(:) = molfracs_atoms_(:) + self%species_composition(:,j)*molfracs_species(j)
       enddo
-      atom_fractions_ = atom_fractions_/max(sum(atom_fractions_),tiny(1.0_dp))
+      molfracs_atoms_ = molfracs_atoms_/max(sum(molfracs_atoms_),tiny(1.0_dp))
     endif
 
     ! Compute chemical equilibrium
     call self%dat%easychem(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
-                           N_reactants_in=size(self%species_names), molfracs_atoms=atom_fractions_, &
-                           molfracs_reactants=self%mole_fractions, &
-                           massfracs_reactants=self%mass_fractions, &
+                           N_reactants_in=size(self%species_names), molfracs_atoms=molfracs_atoms_, &
+                           molfracs_reactants=self%molfracs_species, &
+                           massfracs_reactants=self%massfracs_species, &
                            temp=T, press=P, &
                            nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%MMW, rho=self%rho, c_pe=self%c_pe)
     if (self%dat%error) then
@@ -211,41 +211,41 @@ contains
     jj = 1
     do i = 1,size(self%species_names)
       if (self%dat%reac_condensed(i)) then
-        self%mole_fractions_condensate(j) = self%mole_fractions(i)
-        self%mass_fractions_condensate(j) = self%mass_fractions(i)
+        self%molfracs_species_condensate(j) = self%molfracs_species(i)
+        self%massfracs_species_condensate(j) = self%massfracs_species(i)
         j = j + 1
       else
-        self%mole_fractions_gas(jj) = self%mole_fractions(i)
-        self%mass_fractions_gas(jj) = self%mass_fractions(i)
+        self%molfracs_species_gas(jj) = self%molfracs_species(i)
+        self%massfracs_species_gas(jj) = self%massfracs_species(i)
         jj = jj + 1
       endif
     enddo
     if (size(self%condensate_names) > 0) then
-      self%mole_fractions_condensate = self%mole_fractions_condensate/max(sum(self%mole_fractions_condensate),tiny(1.0_dp))
-      self%mass_fractions_condensate = self%mass_fractions_condensate/max(sum(self%mass_fractions_condensate),tiny(1.0_dp))
+      self%molfracs_species_condensate = self%molfracs_species_condensate/max(sum(self%molfracs_species_condensate),tiny(1.0_dp))
+      self%massfracs_species_condensate = self%massfracs_species_condensate/max(sum(self%massfracs_species_condensate),tiny(1.0_dp))
     endif
     if (size(self%gas_names) > 0) then
-      self%mole_fractions_gas = self%mole_fractions_gas/max(sum(self%mole_fractions_gas),tiny(1.0_dp))
-      self%mass_fractions_gas = self%mass_fractions_gas/max(sum(self%mass_fractions_gas),tiny(1.0_dp))
+      self%molfracs_species_gas = self%molfracs_species_gas/max(sum(self%molfracs_species_gas),tiny(1.0_dp))
+      self%massfracs_species_gas = self%massfracs_species_gas/max(sum(self%massfracs_species_gas),tiny(1.0_dp))
     endif
 
     ! Compute the mole fractions of the atoms in the solution
-    self%atom_fractions = 0.0_dp
-    self%atom_fractions_gas = 0.0_dp
-    self%atom_fractions_condensate = 0.0_dp
+    self%molfracs_atoms = 0.0_dp
+    self%molfracs_atoms_gas = 0.0_dp
+    self%molfracs_atoms_condensate = 0.0_dp
     do j = 1,size(self%species_names)
-      self%atom_fractions(:) = self%atom_fractions(:) + self%species_composition(:,j)*self%mole_fractions(j)
+      self%molfracs_atoms(:) = self%molfracs_atoms(:) + self%species_composition(:,j)*self%molfracs_species(j)
       if (self%dat%reac_condensed(j)) then
-        self%atom_fractions_condensate(:) = self%atom_fractions_condensate(:) &
-                                            + self%species_composition(:,j)*self%mole_fractions(j)
+        self%molfracs_atoms_condensate(:) = self%molfracs_atoms_condensate(:) &
+                                            + self%species_composition(:,j)*self%molfracs_species(j)
       else
-        self%atom_fractions_gas(:) = self%atom_fractions_gas(:) &
-                                     + self%species_composition(:,j)*self%mole_fractions(j)
+        self%molfracs_atoms_gas(:) = self%molfracs_atoms_gas(:) &
+                                     + self%species_composition(:,j)*self%molfracs_species(j)
       endif
     enddo
-    self%atom_fractions = self%atom_fractions/max(sum(self%atom_fractions),tiny(1.0_dp))
-    self%atom_fractions_condensate = self%atom_fractions_condensate/max(sum(self%atom_fractions_condensate),tiny(1.0_dp))
-    self%atom_fractions_gas = self%atom_fractions_gas/max(sum(self%atom_fractions_gas),tiny(1.0_dp))
+    self%molfracs_atoms = self%molfracs_atoms/max(sum(self%molfracs_atoms),tiny(1.0_dp))
+    self%molfracs_atoms_condensate = self%molfracs_atoms_condensate/max(sum(self%molfracs_atoms_condensate),tiny(1.0_dp))
+    self%molfracs_atoms_gas = self%molfracs_atoms_gas/max(sum(self%molfracs_atoms_gas),tiny(1.0_dp))
 
   end subroutine
 

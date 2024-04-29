@@ -262,43 +262,43 @@ contains
       stop 1
     endif
 
-    call cea%solve(1.0_dp, 1000.0_dp, atom_fractions=X, err=err)
+    call cea%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
 
-    call cea2%solve(1.0_dp, 1000.0_dp, atom_fractions=X, err=err)
+    call cea2%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
 
-    do i = 1,size(cea%mole_fractions)
-      if (.not.is_close(cea%mole_fractions(i),correct_answer(i)) .and. cea%mole_fractions(i) > 1.0e-50_dp) then
-        print*,cea%mole_fractions(i),correct_answer(i)
+    do i = 1,size(cea%molfracs_species)
+      if (.not.is_close(cea%molfracs_species(i),correct_answer(i)) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
+        print*,cea%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
       endif
     enddo
 
-    do i = 1,size(cea2%mole_fractions)
-      if (.not.is_close(cea2%mole_fractions(i),correct_answer(i)) .and. cea2%mole_fractions(i) > 1.0e-50_dp) then
-        print*,cea2%mole_fractions(i),correct_answer(i)
+    do i = 1,size(cea2%molfracs_species)
+      if (.not.is_close(cea2%molfracs_species(i),correct_answer(i)) .and. cea2%molfracs_species(i) > 1.0e-50_dp) then
+        print*,cea2%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
       endif
     enddo
 
-    call cea%solve(1.0_dp, 1000.0_dp, species_fractions=cea%mole_fractions, err=err)
+    call cea%solve(1.0_dp, 1000.0_dp, molfracs_species=cea%molfracs_species, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
 
-    do i = 1,size(cea%mole_fractions)
-      if (.not.is_close(cea%mole_fractions(i),correct_answer(i)) .and. cea%mole_fractions(i) > 1.0e-50_dp) then
-        print*,cea%mole_fractions(i),correct_answer(i)
+    do i = 1,size(cea%molfracs_species)
+      if (.not.is_close(cea%molfracs_species(i),correct_answer(i)) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
+        print*,cea%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
       endif
