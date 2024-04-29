@@ -3,9 +3,9 @@ module equilibrate_const
   implicit none
   public
 
-  integer, parameter :: atom_str_len = 2
-  integer, parameter :: reac_str_len = 15
   integer, parameter :: s_str_len = 20
+  integer, parameter :: atom_str_len = s_str_len
+  integer, parameter :: reac_str_len = s_str_len
 
   ! Constants
   real(dp), parameter :: R = 8.3144598d0 !! J/(K*mol)

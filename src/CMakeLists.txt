@@ -7,7 +7,10 @@ CPMAddPackage(
   EXCLUDE_FROM_ALL ON
 )
 
+configure_file(equilibrate_version.f90.in ${CMAKE_CURRENT_BINARY_DIR}/equilibrate_version.f90)
+
 add_library(equilibrate
+  ${CMAKE_CURRENT_BINARY_DIR}/equilibrate_version.f90
   equilibrate_yaml.f90
   equilibrate_const.f90
   equilibrate_cea.f90
