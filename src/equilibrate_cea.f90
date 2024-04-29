@@ -661,7 +661,7 @@ contains
    end subroutine da_REORDER_SPECS
 
    !> MAIN SUBROUTINE
-   subroutine solve(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms, &
+   subroutine solve(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms,mass_tol, &
       molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
 
       !! I/O:
@@ -670,6 +670,7 @@ contains
       character(len=2), intent(in)     :: verbo
       logical, intent(in) :: verbose2
       real(dp), intent(in)     :: molfracs_atoms(N_atoms_in)
+      real(dp), intent(in) :: mass_tol
       real(dp), intent(out)    :: molfracs_reactants(N_reactants_in), massfracs_reactants(N_reactants_in)
       integer, intent(in)              :: N_atoms_in, N_reactants_in
       real(dp), intent(in)     :: temp, press
@@ -692,6 +693,7 @@ contains
       self%verbose_cond = (verbo == 'vy')
       self%verbose2 = verbose2
       self%quick = (mode /= 's')
+      self%mass_tol = mass_tol
       self%remove_ions = .FALSE.
 
       ! call INIT_RAND_SEED()

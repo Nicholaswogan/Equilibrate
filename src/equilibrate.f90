@@ -32,6 +32,9 @@ module equilibrate
     real(dp) :: nabla_ad, gamma2, MMW, rho, c_pe
 
     logical :: verbose = .false. !! Determines amount of printing.
+    real(dp) :: mass_tol = 1.0e-2_dp !! Degree to which mass will be balanced. 
+                                     !! Gordon & McBride's default is 1.0e-6, but
+                                     !! it seems like 1.0e-2 is OK.
 
     !> Driver class
     type(CEAData), allocatable :: dat
@@ -214,6 +217,7 @@ contains
     ! Compute chemical equilibrium
     call self%dat%solve(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
                            N_reactants_in=size(self%species_names), molfracs_atoms=molfracs_atoms_, &
+                           mass_tol=self%mass_tol, &
                            molfracs_reactants=self%molfracs_species, &
                            massfracs_reactants=self%massfracs_species, &
                            temp=T, press=P, &
