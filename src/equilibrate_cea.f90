@@ -419,21 +419,6 @@ contains
 
    end function
 
-   !> Convert a 2-dimensional array of characters into an array of strings ; used in SET_DATA
-   ! subroutine da_CH2STR(chr, str)
-
-   !    character, intent(in)                   :: chr(:,:)  ! 1 row = 1 string
-   !    character(len=size(chr,2)), intent(out) :: str(size(chr,1))
-   !    integer                                 :: i, j
-
-   !    str = ''
-   !    do i = 1, size(chr,1)
-   !       do j = 1, size(chr,2)
-   !          str(i) = trim(str(i))//chr(i,j)
-   !       end do
-   !    end do
-   ! end subroutine da_CH2STR
-
    !> Sets id_atoms, where the i-th cell corresponds to names_atoms(i) and contains the index of the same atom in names_atoms_save
    !> names_atoms_save(id_atoms(i)) = names_atoms(i)
    subroutine da_ATOMS_ID(self)
@@ -2357,87 +2342,6 @@ contains
       END DO
       b_0 = molfracs_atoms/b_0_norm
    end subroutine ec_b_0
-
-   ! subroutine ec_a(N_atoms_use, a)
-   !    integer, intent(in)           :: N_atoms_use
-   !    real(dp), intent(out) :: a()
-   !    a = 0d0
-   !    DO i_atom = 1, N_atoms_use
-   !       DO i_reac = 1, self%N_gas
-   !          IF (self%remove_ions) THEN
-   !             IF (self%reac_ion(i_reac)) THEN
-   !                a(i_reac,1:N_atoms_use) = 0d0
-   !                CYCLE
-   !             END IF
-   !          END IF
-   !          DO i_ratom = 1, 5
-   !             IF (self%reac_atoms_id(i_ratom, i_reac)>0 .and. self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, i_reac)) then
-   !                a(i_reac,i_atom) = self%reac_stoich(i_ratom,i_reac)*mol
-   !             END IF
-   !          END DO
-   !       END DO
-   !       DO i_reac = self%N_gas+1, N_species
-   !          DO i_ratom = 1, 5
-   !             IF (self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))>0 .and. &
-   !             self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))) then
-   !                a(i_reac,i_atom) = self%reac_stoich(i_ratom,solid_indices(i_reac-self%N_gas))*mol
-   !             END IF
-   !          END DO
-   !       END DO
-   !    END DO
-   ! end subroutine ec_a
-
-   !> Taken from http://gcc.gnu.org/onlinedocs/gfortran/RANDOM_005fSEED.html#RANDOM_005fSEED
-  !  subroutine INIT_RAND_SEED()
-  !     use iso_fortran_env, only: int64
-  !     integer, allocatable :: seed(:)
-  !     integer :: i, n, un, istat, dt(8), pid
-  !     integer(int64) :: t
-
-  !     call random_seed(size = n)
-  !     allocate(seed(n))
-  !     ! First try if the OS provides a random number generator
-  !     open(newunit=un, file="/dev/urandom", access="stream", &
-  !     form="unformatted", action="read", status="old", iostat=istat)
-  !     if (istat == 0) then
-  !        read(un) seed
-  !        close(un)
-  !     else
-  !        ! Fallback to OR:ing the current time and pid. The PID is
-  !        ! useful in case one launches multiple instances of the same
-  !        ! program in parallel.
-  !        call system_clock(t)
-  !        if (t == 0) then
-  !           call date_and_time(values=dt)
-  !           t = (dt(1) - 1970) * 365_int64 * 24 * 60 * 60 * 1000 &
-  !           + dt(2) * 31_int64 * 24 * 60 * 60 * 1000 &
-  !           + dt(3) * 24_int64 * 60 * 60 * 1000 &
-  !           + dt(5) * 60 * 60 * 1000 &
-  !           + dt(6) * 60 * 1000 + dt(7) * 1000 &
-  !           + dt(8)
-  !        end if
-  !        pid = getpid()
-  !        t = ieor(t, int(pid, kind(t)))
-  !        do i = 1, n
-  !           seed(i) = lcg(t)
-  !        end do
-  !     end if
-  !     call random_seed(put=seed)
-  !     contains
-  !     ! This simple PRNG might not be good enough for real work, but is
-  !     ! sufficient for seeding a better PRNG.
-  !     function lcg(s)
-  !        integer :: lcg
-  !        integer(int64) :: s
-  !        if (s == 0) then
-  !           s = 104729
-  !        else
-  !           s = mod(s, 4294967296_int64)
-  !        end if
-  !        s = mod(s * 279470273_int64, 4294967291_int64)
-  !        lcg = int(mod(s, int(huge(0), int64)), kind(0))
-  !     end function lcg
-  !  end subroutine INIT_RAND_SEED
 
    !> Invert the small matrix
    subroutine ec_INVERT_MATRIX_SHORT(self, lens,matrix,vector,solution_vector)
