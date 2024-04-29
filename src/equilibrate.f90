@@ -142,30 +142,61 @@ contains
 
   end function
 
-  subroutine solve(self, P, T, X, err)
+  subroutine solve(self, P, T, atom_fractions, species_fractions, err)
     class(ChemEquiAnalysis), intent(inout) :: self
     real(dp), intent(in) :: P
     real(dp), intent(in) :: T
-    real(dp), intent(in) :: X(:)
+    real(dp), optional, intent(in) :: atom_fractions(:)
+    real(dp), optional, intent(in) :: species_fractions(:)
     character(:), allocatable, intent(out) :: err
 
-    real(dp), allocatable :: X_(:)
+    real(dp), allocatable :: atom_fractions_(:)
     integer :: i, j, jj
 
-    if (size(X) /= size(self%atoms_names)) then
-      err = 'Input "X" has the wrong size'
+    if (present(atom_fractions) .and. present(species_fractions)) then
+      err = 'Both "atom_fractions" and "species_fractions" are inputs, but only one is allowed.'
       return
     endif
-    if (any(X < 0)) then
-      err = 'Input "X" can not be less than zero'
+    if (.not.present(atom_fractions) .and. .not.present(species_fractions)) then
+      err = 'Neither "atom_fractions" or "species_fractions" are inputs, but one is needed.'
       return
     endif
 
-    ! normalize
-    X_ = X/sum(X)
+    ! Input is an array of atom mole fractions
+    if (present(atom_fractions)) then
+      if (size(atom_fractions) /= size(self%atoms_names)) then
+        err = 'Input "atom_fractions" has the wrong size'
+        return
+      endif
+      if (any(atom_fractions < 0)) then
+        err = 'Input "atom_fractions" can not be less than zero'
+        return
+      endif
+      atom_fractions_ = atom_fractions/max(sum(atom_fractions),tiny(1.0_dp))
+    endif
 
+    ! Input is an array of species mole fractions
+    if (present(species_fractions)) then
+      if (size(species_fractions) /= size(self%species_names)) then
+        err = 'Input "species_fractions" has the wrong size'
+        return
+      endif
+      if (any(species_fractions < 0)) then
+        err = 'Input "species_fractions" can not be less than zero'
+        return
+      endif
+
+      allocate(atom_fractions_(size(self%atoms_names)))
+      atom_fractions_ = 0.0_dp
+      do j = 1,size(self%species_names)
+        atom_fractions_(:) = atom_fractions_(:) + self%species_composition(:,j)*species_fractions(j)
+      enddo
+      atom_fractions_ = atom_fractions_/max(sum(atom_fractions_),tiny(1.0_dp))
+    endif
+
+    ! Compute chemical equilibrium
     call self%dat%easychem(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
-                           N_reactants_in=size(self%species_names), molfracs_atoms=X_, &
+                           N_reactants_in=size(self%species_names), molfracs_atoms=atom_fractions_, &
                            molfracs_reactants=self%mole_fractions, &
                            massfracs_reactants=self%mass_fractions, &
                            temp=T, press=P, &
@@ -175,6 +206,7 @@ contains
       return
     endif 
 
+    ! Compute mole fractions of gases and condensates in the solution
     j = 1
     jj = 1
     do i = 1,size(self%species_names)
@@ -188,7 +220,6 @@ contains
         jj = jj + 1
       endif
     enddo
-
     if (size(self%condensate_names) > 0) then
       self%mole_fractions_condensate = self%mole_fractions_condensate/max(sum(self%mole_fractions_condensate),tiny(1.0_dp))
       self%mass_fractions_condensate = self%mass_fractions_condensate/max(sum(self%mass_fractions_condensate),tiny(1.0_dp))
@@ -198,6 +229,7 @@ contains
       self%mass_fractions_gas = self%mass_fractions_gas/max(sum(self%mass_fractions_gas),tiny(1.0_dp))
     endif
 
+    ! Compute the mole fractions of the atoms in the solution
     self%atom_fractions = 0.0_dp
     self%atom_fractions_gas = 0.0_dp
     self%atom_fractions_condensate = 0.0_dp
