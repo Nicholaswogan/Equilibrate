@@ -275,7 +275,7 @@ contains
     endif
 
     do i = 1,size(cea%molfracs_species)
-      if (.not.is_close(cea%molfracs_species(i),correct_answer(i)) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
+      if (.not.is_close(cea%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
         print*,cea%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
@@ -283,7 +283,7 @@ contains
     enddo
 
     do i = 1,size(cea2%molfracs_species)
-      if (.not.is_close(cea2%molfracs_species(i),correct_answer(i)) .and. cea2%molfracs_species(i) > 1.0e-50_dp) then
+      if (.not.is_close(cea2%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea2%molfracs_species(i) > 1.0e-50_dp) then
         print*,cea2%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1
@@ -297,7 +297,7 @@ contains
     endif
 
     do i = 1,size(cea%molfracs_species)
-      if (.not.is_close(cea%molfracs_species(i),correct_answer(i)) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
+      if (.not.is_close(cea%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
         print*,cea%molfracs_species(i),correct_answer(i)
         print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
         stop 1

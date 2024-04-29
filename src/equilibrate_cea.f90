@@ -96,17 +96,33 @@ contains
 
       ! 4 cases to consider
       if (present(atoms_names) .and. present(reactants_names)) then
-         atoms_names_ = atoms_names
+         ! Copy over, but exclude "E" if it present.
+         allocate(atoms_names_(1))
+         do i = 1,size(atoms_names)
+            if (trim(atoms_names(i)) /= 'E') then
+               atom_tmp = atoms_names(i)
+               atoms_names_ = [atoms_names_, atom_tmp]
+            endif
+         enddo
+         atoms_names_ = atoms_names_(2:size(atoms_names_))
          reactants_names_ = reactants_names 
       elseif (present(atoms_names) .and. .not.present(reactants_names)) then
-         atoms_names_ = atoms_names
+         ! Copy over, but exclude "E" if it present.
+         allocate(atoms_names_(1))
+         do i = 1,size(atoms_names)
+            if (trim(atoms_names(i)) /= 'E') then
+               atom_tmp = atoms_names(i)
+               atoms_names_ = [atoms_names_, atom_tmp]
+            endif
+         enddo
+         atoms_names_ = atoms_names_(2:size(atoms_names_))
 
          ! Make sure that input atoms are in yaml file
-         do i = 1,size(atoms_names_)
-            ind = findloc(rl%atoms_names, atoms_names_(i), 1)
+         do i = 1,size(atoms_names)
+            ind = findloc(rl%atoms_names, atoms_names(i), 1)
             if (ind == 0) then
                self%error = .true.
-               self%err_msg = 'Input atom '//trim(atoms_names_(i))//' is not in '//trim(fpath)
+               self%err_msg = 'Input atom '//trim(atoms_names(i))//' is not in '//trim(fpath)
                return
             endif
          enddo
@@ -117,7 +133,7 @@ contains
             keep = .true.
             do j = 1,rl%natoms
                if (rl%r(i)%composition(j) /= 0) then
-                  ind = findloc(atoms_names_, rl%atoms_names(j), 1)
+                  ind = findloc(atoms_names, rl%atoms_names(j), 1)
                   if (ind == 0) then
                      keep = .false.
                      exit
