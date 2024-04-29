@@ -8,7 +8,10 @@ cdef extern void deallocate_chemequianalysis(void *ptr);
 
 # Wrappers for functions
 
-cdef extern void chemequianalysis_create_wrapper(void *ptr, char *thermofile, char *err);
+cdef extern void chemequianalysis_create_wrapper(void *ptr, char *thermofile, 
+                         cbool *atoms_present, int *atoms_dim, char *atoms,
+                         cbool *species_present, int *species_dim, char *species,
+                         char *err);
 cdef extern void chemequianalysis_solve_wrapper(void *ptr, double *P, double *T,
                          cbool *molfracs_atoms_present, int *molfracs_atoms_dim, double *molfracs_atoms, 
                          cbool *molfracs_species_present, int *molfracs_species_dim, double *molfracs_species, 

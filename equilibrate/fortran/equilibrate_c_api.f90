@@ -33,14 +33,24 @@ contains
 
   !~~ Subroutine wrappers ~~!
 
-  subroutine chemequianalysis_create_wrapper(ptr, thermofile, err) bind(c)
-    use equilibrate, only: ChemEquiAnalysis
+  subroutine chemequianalysis_create_wrapper(ptr, thermofile, &
+                                             atoms_present, atoms_dim, atoms, &
+                                             species_present, species_dim, species, err) bind(c)
+    use equilibrate, only: ChemEquiAnalysis, s_str_len
     type(c_ptr), intent(in) :: ptr
     character(kind=c_char), intent(in) :: thermofile(*)
+    logical(c_bool), intent(in) :: atoms_present
+    integer(c_int), intent(in) :: atoms_dim
+    character(kind=c_char), intent(in) :: atoms(atoms_dim*s_str_len+1)
+    logical(c_bool), intent(in) :: species_present
+    integer(c_int), intent(in) :: species_dim
+    character(kind=c_char), intent(in) :: species(species_dim*s_str_len+1)
     character(kind=c_char), intent(out) :: err(err_len+1)
 
     character(len=:), allocatable :: thermofile_f
+    character(s_str_len), allocatable :: atoms_f(:), species_f(:)
     character(:), allocatable :: err_f
+    integer :: i, j, k
     type(ChemEquiAnalysis), pointer :: cea
 
     call c_f_pointer(ptr, cea)
@@ -48,7 +58,31 @@ contains
     allocate(character(len=len_cstring(thermofile))::thermofile_f)
     call copy_string_ctof(thermofile, thermofile_f)
 
-    cea = ChemEquiAnalysis(thermofile_f, err=err_f)
+    allocate(atoms_f(atoms_dim))
+    do i = 1,atoms_dim
+      do j = 1,s_str_len
+        k = j + (i - 1) * s_str_len
+        atoms_f(i)(j:j) = atoms(k)
+      enddo
+    enddo
+
+    allocate(species_f(species_dim))
+    do i = 1,species_dim
+      do j = 1,s_str_len
+        k = j + (i - 1) * s_str_len
+        species_f(i)(j:j) = species(k)
+      enddo
+    enddo
+
+    if (atoms_present .and. species_present) then
+      cea = ChemEquiAnalysis(thermofile_f, atoms=atoms_f, species=species_f, err=err_f)
+    elseif (atoms_present .and. .not.species_present) then
+      cea = ChemEquiAnalysis(thermofile_f, atoms=atoms_f, err=err_f)
+    elseif (.not.atoms_present .and. species_present) then
+      cea = ChemEquiAnalysis(thermofile_f, species=species_f, err=err_f)
+    elseif (.not.atoms_present .and. .not.species_present) then
+      cea = ChemEquiAnalysis(thermofile_f, err=err_f)
+    endif
 
     err(1) = c_null_char
     if (allocated(err_f)) then

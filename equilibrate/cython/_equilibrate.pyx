@@ -13,13 +13,25 @@ cdef class ChemEquiAnalysis:
 
   cdef void *_ptr
 
-  def __init__(self, thermofile = None):           
-    """Initializes `ChemEquiAnalysis`
+  def __init__(self, thermofile = None, atoms = None, species = None):           
+    """Initializes the chemical equilibrium solver given an input thermodynamic file.
+    The file can only have ".yaml" format. `atoms` and `species` are optional inputs 
+    with the following effects:
+    - If `atoms` are specified but not `species`, then the code will consider all 
+      species with the input `atoms`.
+    - If `species` are specified but not `atoms`, then the code will consider all
+      atoms corresponding to the input `species`.
+    - If neither `atoms` or `species` are specified, then the code will consider all
+      atoms and species in the input file.
 
     Parameters
     ----------
     thermofile : str
-        The input thermodynamic .yaml file
+        Path to file describing the thermodynamic data of all species.
+    atoms : list, optional
+        Names of atoms to include.
+    species : list, optional
+        Names of species to include.
     """
     # Allocate memory
     cea_pxd.allocate_chemequianalysis(&self._ptr)
@@ -28,9 +40,30 @@ cdef class ChemEquiAnalysis:
     cdef bytes thermofile_b = pystring2cstring(thermofile)
     cdef char *thermofile_c = thermofile_b
     cdef char err[ERR_LEN+1]
+
+    cdef cbool atoms_present = False
+    cdef int atoms_dim = 1
+    cdef ndarray atoms_c = np.zeros(atoms_dim*S_STR_LEN + 1, 'S1')
+    if atoms is not None:
+      atoms_present = True
+      atoms_dim = len(atoms)
+      atoms_c = list2cstring(atoms, S_STR_LEN)
+
+    cdef cbool species_present = False
+    cdef int species_dim = 1
+    cdef ndarray species_c = np.zeros(species_dim*S_STR_LEN + 1, 'S1')
+    if species is not None:
+      species_present = True
+      species_dim = len(species)
+      species_c = list2cstring(species, S_STR_LEN)
+
+    if atoms_present and species_present:
+      raise EquilibrateException('"atoms" and "species" can not both be inputs.')
     
     # Initialize
     cea_pxd.chemequianalysis_create_wrapper(&self._ptr, thermofile_c,
+                                            &atoms_present, &atoms_dim, <char *>atoms_c.data,
+                                            &species_present, &species_dim, <char *>species_c.data,
                                             err)
     if len(err.strip()) > 0:
       raise EquilibrateException(err.decode("utf-8").strip())
@@ -203,6 +236,15 @@ cdef pystring2cstring(str pystring):
 cdef c2stringarr(ndarray c_str_arr, int str_len, int arr_len):  
   bs = c_str_arr[:-1].tobytes()
   return [bs[i:i+str_len].decode().strip() for i in range(0, str_len*arr_len, str_len)]
+
+cdef list2cstring(list arr, int str_len):
+  arr_c = np.zeros(len(arr)*str_len + 1, 'S1')
+  for i in range(len(arr)):
+    if len(arr[i]) > str_len:
+          raise Exception('Failed to convert Python list to a C string')
+    arr_c[i*str_len:(i+1)*str_len] = b' '
+    arr_c[i*str_len:i*str_len+len(arr[i])] = np.array([elem.encode('utf-8') for elem in arr[i]])
+  return arr_c
 
 class EquilibrateException(Exception):
     pass
