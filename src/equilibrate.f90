@@ -45,10 +45,22 @@ module equilibrate
 
 contains
     
+  !> Initializes the chemical equilibrium solver given an input thermodynamic file.
+  !> The file can have ".inp" or ".yaml" formats. If the file is ".inp" format, then
+  !> both `atoms` and `species` must be inputs, describing the atoms and species to 
+  !> consider in equilibrium chemistry. If the file is ".yaml" format, then
+  !> `atoms` and `species` become optional inputs with the following effects:
+  !> - If `atoms` are specified but not `species`, then the code will consider all 
+  !>   species with the input `atoms`.
+  !> - If `species` are specified but not `atoms`, then the code will consider all
+  !>   atoms corresponding to the input `species`.
+  !> - If neither `atoms` or `species` are specified, then the code will consider all
+  !>   atoms and species in the input file.
   function create_ChemEquiAnalysis(thermopath, atoms, species, err) result(cea)
-    character(*), intent(in) :: thermopath
-    character(*), optional, intent(in) :: atoms(:)
-    character(*), optional, intent(in) :: species(:)
+    character(*), intent(in) :: thermopath !! Path to file describing the thermodynamic 
+                                           !! data of each species
+    character(*), optional, intent(in) :: atoms(:) !! Names of atoms to include.
+    character(*), optional, intent(in) :: species(:) !! Names of species to include.
     character(:), allocatable, intent(out) :: err
     type(ChemEquiAnalysis) :: cea
 
@@ -141,11 +153,17 @@ contains
 
   end function
 
+  !> Computes chemical equilibrium given input atom or species mole fractions.
+  !> If successful, then the equilibrium composition will be stored in a number
+  !> of attributes (e.g., self%molfracs_species). If unsuccessful, then the variable
+  !> `err` is allocated with an error message.
   subroutine solve(self, P, T, molfracs_atoms, molfracs_species, err)
     class(ChemEquiAnalysis), intent(inout) :: self
-    real(dp), intent(in) :: P
-    real(dp), intent(in) :: T
+    real(dp), intent(in) :: P !! Pressure in bars
+    real(dp), intent(in) :: T !! Temperature in Kelvin
+    !> Atom mole fractions in the same order and length as self%atoms_names.
     real(dp), optional, intent(in) :: molfracs_atoms(:)
+    !> Species mole fractions in the same order and length as self%species_names.
     real(dp), optional, intent(in) :: molfracs_species(:)
     character(:), allocatable, intent(out) :: err
 
