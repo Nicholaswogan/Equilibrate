@@ -49,7 +49,7 @@ module equilibrate_cea
    
    contains
       procedure :: set_data
-      procedure :: easychem
+      procedure :: solve
    end type
 
 contains
@@ -676,7 +676,7 @@ contains
    end subroutine da_REORDER_SPECS
 
    !> MAIN SUBROUTINE
-   subroutine EASYCHEM(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms, &
+   subroutine solve(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms, &
       molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
 
       !! I/O:
@@ -739,7 +739,7 @@ contains
 
       c_pe = c_pe*1d7 ! J/(g K) to erg/(g K)
 
-   end subroutine EASYCHEM
+   end subroutine
 
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(self,temp,N_reac,C_P_0, H_0, S_0)

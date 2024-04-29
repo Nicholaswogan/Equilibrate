@@ -7,30 +7,33 @@ module equilibrate
   public :: ChemEquiAnalysis, dp, atom_str_len, reac_str_len
 
   type :: ChemEquiAnalysis
-    character(atom_str_len), allocatable :: atoms_names(:)
-    character(reac_str_len), allocatable :: species_names(:)
-    character(reac_str_len), allocatable :: gas_names(:)
-    character(reac_str_len), allocatable :: condensate_names(:)
+    character(atom_str_len), allocatable :: atoms_names(:) !! Names of atoms
+    character(reac_str_len), allocatable :: species_names(:) !! Names of species
+    character(reac_str_len), allocatable :: gas_names(:) !! Names of gases
+    character(reac_str_len), allocatable :: condensate_names(:) !! Names of condensates
 
+    !> Describes the composition of each species (i.e., how many atoms)
     real(dp), allocatable, private :: species_composition(:,:)
 
-    real(dp), allocatable :: molfracs_atoms(:)
-    real(dp), allocatable :: molfracs_species(:)
-    real(dp), allocatable :: massfracs_species(:)
+    ! All below are results of an equilibrium solve.
 
-    real(dp), allocatable :: molfracs_atoms_gas(:)
-    real(dp), allocatable :: molfracs_species_gas(:)
-    real(dp), allocatable :: massfracs_species_gas(:)
+    real(dp), allocatable :: molfracs_atoms(:) !! Mole fractions of each atom (size(atoms_names))
+    real(dp), allocatable :: molfracs_species(:) !! Mole fractions of each species (size(species_names))
+    real(dp), allocatable :: massfracs_species(:) !! Mass fractions of each species (size(species_names))
 
-    real(dp), allocatable :: molfracs_atoms_condensate(:)
-    real(dp), allocatable :: molfracs_species_condensate(:)
-    real(dp), allocatable :: massfracs_species_condensate(:)
+    real(dp), allocatable :: molfracs_atoms_gas(:) !! Mole fractions of atoms in gas phase (size(atoms_names))
+    real(dp), allocatable :: molfracs_species_gas(:) !! Mole fractions of species in gas phase (size(gas_names))
 
+    real(dp), allocatable :: molfracs_atoms_condensate(:) !! Mole fractions of atoms in condensed phase (size(atoms_names))
+    real(dp), allocatable :: molfracs_species_condensate(:) !! Mole fractions of species in condensed 
+                                                            !! phase (size(condensate_names))
+
+    ! A few undocumented outputs.
     real(dp) :: nabla_ad, gamma2, MMW, rho, c_pe
 
-    logical :: verbose = .false.
+    logical :: verbose = .false. !! Determines amount of printing.
 
-    !> driver routines
+    !> Driver class
     type(CEAData), allocatable :: dat
 
   contains
@@ -107,8 +110,6 @@ contains
       deallocate(cea%molfracs_species_gas)
       deallocate(cea%molfracs_species_condensate)
       deallocate(cea%massfracs_species)
-      deallocate(cea%massfracs_species_gas)
-      deallocate(cea%massfracs_species_condensate)
     endif
     allocate(cea%species_composition(size(cea%atoms_names),size(cea%species_names)))
     allocate(cea%molfracs_atoms(size(cea%atoms_names)))
@@ -118,8 +119,6 @@ contains
     allocate(cea%molfracs_species_gas(size(cea%gas_names)))
     allocate(cea%molfracs_species_condensate(size(cea%condensate_names)))
     allocate(cea%massfracs_species(size(cea%species_names)))
-    allocate(cea%massfracs_species_gas(size(cea%gas_names)))
-    allocate(cea%massfracs_species_condensate(size(cea%condensate_names)))
 
     ! Get composition of each species
     cea%species_composition = 0.0_dp
@@ -195,7 +194,7 @@ contains
     endif
 
     ! Compute chemical equilibrium
-    call self%dat%easychem(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
+    call self%dat%solve(mode='q', verbo='  ', verbose2=self%verbose, N_atoms_in=size(self%atoms_names), &
                            N_reactants_in=size(self%species_names), molfracs_atoms=molfracs_atoms_, &
                            molfracs_reactants=self%molfracs_species, &
                            massfracs_reactants=self%massfracs_species, &
@@ -212,21 +211,17 @@ contains
     do i = 1,size(self%species_names)
       if (self%dat%reac_condensed(i)) then
         self%molfracs_species_condensate(j) = self%molfracs_species(i)
-        self%massfracs_species_condensate(j) = self%massfracs_species(i)
         j = j + 1
       else
         self%molfracs_species_gas(jj) = self%molfracs_species(i)
-        self%massfracs_species_gas(jj) = self%massfracs_species(i)
         jj = jj + 1
       endif
     enddo
     if (size(self%condensate_names) > 0) then
       self%molfracs_species_condensate = self%molfracs_species_condensate/max(sum(self%molfracs_species_condensate),tiny(1.0_dp))
-      self%massfracs_species_condensate = self%massfracs_species_condensate/max(sum(self%massfracs_species_condensate),tiny(1.0_dp))
     endif
     if (size(self%gas_names) > 0) then
       self%molfracs_species_gas = self%molfracs_species_gas/max(sum(self%molfracs_species_gas),tiny(1.0_dp))
-      self%massfracs_species_gas = self%massfracs_species_gas/max(sum(self%massfracs_species_gas),tiny(1.0_dp))
     endif
 
     ! Compute the mole fractions of the atoms in the solution
