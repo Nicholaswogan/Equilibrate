@@ -1,5 +1,5 @@
 program main
-  use equilibrate, only: ChemEquiAnalysis, dp, reac_str_len, atom_str_len
+  use equilibrate, only: ChemEquiAnalysis, dp, s_str_len
   implicit none
 
   call test()
@@ -9,8 +9,8 @@ contains
   subroutine test()
     type(ChemEquiAnalysis) :: cea, cea2
     character(:), allocatable :: err
-    character(reac_str_len), allocatable :: species(:)
-    character(atom_str_len), allocatable :: atoms(:)
+    character(s_str_len), allocatable :: species(:)
+    character(s_str_len), allocatable :: atoms(:)
     real(dp), allocatable :: X(:), correct_answer(:)
     integer :: i
 
