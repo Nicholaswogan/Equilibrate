@@ -2043,7 +2043,7 @@ contains
          END DO
       END IF
       total_good = .TRUE.
-      IF (n*ABS(solution_vector(N_species+N_atoms_use+1))/SUM(n_spec) > 05.d-5) THEN
+      IF (n*ABS(solution_vector(N_species+N_atoms_use+1))/SUM(n_spec) > 0.5d-5) THEN
          total_good = .FALSE.
       END IF
 
@@ -2094,7 +2094,7 @@ contains
          END DO
       END DO
 
-      mval_mass_good = MAXVAL(b_0)*1d-2
+      mval_mass_good = MAXVAL(b_0)*self%mass_tol
       DO i_atom = 1, N_atoms_use
          IF ((abs(b_0(i_atom)-sum(a(1:N_species,i_atom)*n_spec(1:N_species))) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
             mass_good = .FALSE.
@@ -2107,16 +2107,16 @@ contains
          END IF
       END DO
 
-      IF ((.NOT. mass_good) .OR. (.NOT. pi_good)) THEN
-         mass_good = .TRUE.
-         pi_good = .TRUE.
-         DO i_reac = 1, self%N_reactants
-            IF (ABS(n_spec(i_reac)-n_spec_old(i_reac)) > 1d-10) THEN
-               mass_good = .FALSE.
-               pi_good = .FALSE.
-            END IF
-         END DO
-      END IF
+      ! IF ((.NOT. mass_good) .OR. (.NOT. pi_good)) THEN
+      !    mass_good = .TRUE.
+      !    pi_good = .TRUE.
+      !    DO i_reac = 1, self%N_reactants
+      !       IF (ABS(n_spec(i_reac)-n_spec_old(i_reac)) > 1d-10) THEN
+      !          mass_good = .FALSE.
+      !          pi_good = .FALSE.
+      !       END IF
+      !    END DO
+      ! END IF
 
       !!!-------------------
 
