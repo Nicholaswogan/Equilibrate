@@ -94,7 +94,7 @@ contains
   subroutine chemequianalysis_solve_wrapper(ptr, P, T, &
                                             molfracs_atoms_present, molfracs_atoms_dim, molfracs_atoms, &
                                             molfracs_species_present, molfracs_species_dim, molfracs_species, &
-                                            err) bind(c)
+                                            converged, err) bind(c)
     use equilibrate, only: ChemEquiAnalysis
     type(c_ptr), intent(in) :: ptr
     real(c_double), intent(in) :: P
@@ -105,6 +105,7 @@ contains
     logical(c_bool), intent(in) :: molfracs_species_present
     integer(c_int), intent(in) :: molfracs_species_dim
     real(c_double), intent(in) :: molfracs_species(molfracs_species_dim)
+    logical(c_bool), intent(out) :: converged
     character(kind=c_char), intent(out) :: err(err_len+1)
 
     character(:), allocatable :: err_f
@@ -113,13 +114,13 @@ contains
     call c_f_pointer(ptr, cea)
 
     if (molfracs_atoms_present .and. molfracs_species_present) then
-      call cea%solve(P, T, molfracs_atoms=molfracs_atoms, molfracs_species=molfracs_species, err=err_f)
+      converged = cea%solve(P, T, molfracs_atoms=molfracs_atoms, molfracs_species=molfracs_species, err=err_f)
     elseif (molfracs_atoms_present .and. .not.molfracs_species_present) then
-      call cea%solve(P, T, molfracs_atoms=molfracs_atoms, err=err_f)
+      converged = cea%solve(P, T, molfracs_atoms=molfracs_atoms, err=err_f)
     elseif (.not.molfracs_atoms_present .and. molfracs_species_present) then
-      call cea%solve(P, T, molfracs_species=molfracs_species, err=err_f)
+      converged = cea%solve(P, T, molfracs_species=molfracs_species, err=err_f)
     elseif (.not.molfracs_atoms_present .and. .not.molfracs_species_present) then
-      call cea%solve(P, T, err=err_f)
+      converged = cea%solve(P, T, err=err_f)
     endif
 
     err(1) = c_null_char
@@ -378,6 +379,24 @@ contains
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
     arr = cea%molfracs_species_condensate
+  end subroutine
+
+  subroutine chemequianalysis_verbose_get(ptr, val) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), intent(in) :: ptr
+    logical(c_bool), intent(out) :: val
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    val = cea%verbose
+  end subroutine
+  
+  subroutine chemequianalysis_verbose_set(ptr, val) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), intent(in) :: ptr
+    logical(c_bool), intent(in) :: val
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    cea%verbose = val
   end subroutine
 
   subroutine chemequianalysis_mass_tol_get(ptr, val) bind(c)

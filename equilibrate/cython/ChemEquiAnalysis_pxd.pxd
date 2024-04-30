@@ -15,7 +15,7 @@ cdef extern void chemequianalysis_create_wrapper(void *ptr, char *thermofile,
 cdef extern void chemequianalysis_solve_wrapper(void *ptr, double *P, double *T,
                          cbool *molfracs_atoms_present, int *molfracs_atoms_dim, double *molfracs_atoms, 
                          cbool *molfracs_species_present, int *molfracs_species_dim, double *molfracs_species, 
-                         char *err)
+                         cbool *converged, char *err)
 
 # Getters and setters
 
@@ -51,6 +51,9 @@ cdef extern void chemequianalysis_molfracs_atoms_condensate_get(void *ptr, int *
 
 cdef extern void chemequianalysis_molfracs_species_condensate_get_size(void *ptr, int *dim1)
 cdef extern void chemequianalysis_molfracs_species_condensate_get(void *ptr, int *dim1, double *arr)
+
+cdef extern void chemequianalysis_verbose_get(void *ptr, cbool *val)
+cdef extern void chemequianalysis_verbose_set(void *ptr, cbool *val)
 
 cdef extern void chemequianalysis_mass_tol_get(void *ptr, double *val)
 cdef extern void chemequianalysis_mass_tol_set(void *ptr, double *val)

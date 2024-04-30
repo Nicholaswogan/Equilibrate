@@ -12,6 +12,7 @@ contains
     character(s_str_len), allocatable :: species(:)
     character(s_str_len), allocatable :: atoms(:)
     real(dp), allocatable :: X(:), correct_answer(:)
+    logical :: converged
     integer :: i
 
     species = [ &
@@ -262,17 +263,19 @@ contains
       stop 1
     endif
 
-    call cea%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
+    converged = cea%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
+    if (.not.converged) stop 1
 
-    call cea2%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
+    converged = cea2%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
+    if (.not.converged) stop 1
 
     do i = 1,size(cea%molfracs_species)
       if (.not.is_close(cea%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
@@ -290,11 +293,12 @@ contains
       endif
     enddo
 
-    call cea%solve(1.0_dp, 1000.0_dp, molfracs_species=cea%molfracs_species, err=err)
+    converged = cea%solve(1.0_dp, 1000.0_dp, molfracs_species=cea%molfracs_species, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
+    if (.not.converged) stop 1
 
     do i = 1,size(cea%molfracs_species)
       if (.not.is_close(cea%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea%molfracs_species(i) > 1.0e-50_dp) then

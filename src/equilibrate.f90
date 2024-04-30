@@ -161,7 +161,7 @@ contains
   !> If successful, then the equilibrium composition will be stored in a number
   !> of attributes (e.g., self%molfracs_species). If unsuccessful, then the variable
   !> `err` is allocated with an error message.
-  subroutine solve(self, P, T, molfracs_atoms, molfracs_species, err)
+  function solve(self, P, T, molfracs_atoms, molfracs_species, err) result(converged)
     class(ChemEquiAnalysis), intent(inout) :: self
     real(dp), intent(in) :: P !! Pressure in bars
     real(dp), intent(in) :: T !! Temperature in Kelvin
@@ -170,9 +170,12 @@ contains
     !> Species mole fractions in the same order and length as self%species_names.
     real(dp), optional, intent(in) :: molfracs_species(:)
     character(:), allocatable, intent(out) :: err
+    logical :: converged
 
     real(dp), allocatable :: molfracs_atoms_(:)
     integer :: i, j, jj
+
+    converged = .false.
 
     if (present(molfracs_atoms) .and. present(molfracs_species)) then
       err = 'Both "molfracs_atoms" and "molfracs_species" are inputs, but only one is allowed.'
@@ -226,7 +229,8 @@ contains
     if (self%dat%error) then
       err = trim(self%dat%err_msg)
       return
-    endif 
+    endif
+    converged = self%dat%converged
 
     ! Compute mole fractions of gases and condensates in the solution
     j = 1
@@ -265,6 +269,6 @@ contains
     self%molfracs_atoms_condensate = self%molfracs_atoms_condensate/max(sum(self%molfracs_atoms_condensate),tiny(1.0_dp))
     self%molfracs_atoms_gas = self%molfracs_atoms_gas/max(sum(self%molfracs_atoms_gas),tiny(1.0_dp))
 
-  end subroutine
+  end function
 
 end module

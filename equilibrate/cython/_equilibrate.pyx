@@ -99,15 +99,18 @@ cdef class ChemEquiAnalysis:
       molfracs_species_ = molfracs_species
     cdef int molfracs_species_dim = molfracs_species_.shape[0]
 
+    cdef cbool converged
     cdef char err[ERR_LEN+1]
 
     cea_pxd.chemequianalysis_solve_wrapper(&self._ptr, &P, &T,
                          &molfracs_atoms_present, &molfracs_atoms_dim, <double *>molfracs_atoms_.data, 
                          &molfracs_species_present, &molfracs_species_dim, <double *>molfracs_species_.data, 
-                         err)
+                         &converged, err)
 
     if len(err.strip()) > 0:
       raise EquilibrateException(err.decode("utf-8").strip())
+
+    return converged
 
   property atoms_names:
     "List. Names of atoms"
@@ -207,6 +210,15 @@ cdef class ChemEquiAnalysis:
       cdef ndarray arr = np.empty(dim1, np.double)
       cea_pxd.chemequianalysis_molfracs_species_condensate_get(&self._ptr, &dim1, <double *>arr.data)
       return arr
+
+  property verbose:
+    "bool. Determines amount of printing."
+    def __get__(self):
+      cdef cbool val
+      cea_pxd.chemequianalysis_verbose_get(&self._ptr, &val)
+      return val
+    def __set__(self, cbool val):
+      cea_pxd.chemequianalysis_verbose_set(&self._ptr, &val)
 
   property mass_tol:
     """float. Degree to which mass will be balanced. Gordon & McBride's default 

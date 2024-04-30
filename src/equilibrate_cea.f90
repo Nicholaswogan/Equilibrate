@@ -12,6 +12,7 @@ module equilibrate_cea
                                        !! Gordon & McBride's default is 1.0e-6, but
                                        !! this seems too strict.
       logical :: verbose2 !! actual verbosity variable
+      logical :: converged !! for passing convergence
 
       ! Run variables
       integer     :: iter_max
@@ -705,6 +706,7 @@ contains
          RETURN
       end if
 
+      self%converged = .false.
       self%verbose = .FALSE.
       self%verbose_cond = (verbo == 'vy')
       self%verbose2 = verbose2
@@ -884,7 +886,7 @@ contains
       slowed = .FALSE.
       call ec_INIT_ALL_VALS(self,N_atoms_use,self%N_reactants,n,n_spec,pi_atom)
 
-      self%iter_max = 50000 + self%N_reactants/2
+      self%iter_max = 50 + self%N_reactants/2
       current_solids_number = 0
 
       MMW = 0d0
@@ -935,10 +937,11 @@ contains
          END IF
       END DO
 
+      self%converged = converged
       IF (.NOT. converged) THEN
-         self%error = .true.
-         self%err_msg = 'One or more convergence criteria not satisfied (gas only).'
-         return
+        if (self%verbose2) then
+          print*,'One or more convergence criteria not satisfied (gas only).'
+        endif
       END IF
 
       converged = .FALSE.
@@ -1057,6 +1060,7 @@ contains
 
                END DO
 
+               self%converged = converged
                IF (.NOT. converged) THEN
                   IF (self%quick) THEN
                      self%quick = .FALSE.
@@ -1072,9 +1076,9 @@ contains
                      slowed = .TRUE.
                      EXIT
                   ELSE
-                     self%error = .true.
-                     self%err_msg = 'One or more convergence criteria not satisfied (gas & condensates).'
-                     return
+                    if (self%verbose2) then
+                       print*,'One or more convergence criteria not satisfied (gas & condensates).'
+                    endif
                   END IF
                END IF
 
