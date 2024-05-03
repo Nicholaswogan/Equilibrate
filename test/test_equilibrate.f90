@@ -3,6 +3,7 @@ program main
   implicit none
 
   call test()
+  call test_memory()
 
 contains
 
@@ -309,6 +310,32 @@ contains
     enddo
 
     print*,'test passed.'
+
+  end subroutine
+
+  subroutine test_memory()
+    type(ChemEquiAnalysis), pointer :: cea
+    character(:), allocatable :: err
+
+    allocate(cea)
+
+    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.yaml', err=err)
+    if (allocated(err)) then
+      deallocate(cea)
+      print*,err
+      stop 1
+    endif
+
+    cea = ChemEquiAnalysis('../test/thermo_easy_chem_simp_own.yaml', err=err)
+    if (allocated(err)) then
+      deallocate(cea)
+      print*,err
+      stop 1
+    endif
+
+    deallocate(cea)
+
+    print*,'test_memory passed.'
 
   end subroutine
 
