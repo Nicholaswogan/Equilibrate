@@ -25,7 +25,7 @@ contains
 
   subroutine deallocate_chemequianalysis(ptr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(out) :: ptr
+    type(c_ptr), intent(in) :: ptr
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
     deallocate(cea)
