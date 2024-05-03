@@ -68,6 +68,9 @@ cdef class ChemEquiAnalysis:
     if len(err.strip()) > 0:
       raise EquilibrateException(err.decode("utf-8").strip())
 
+  def __dealloc__(self):
+    cea_pxd.deallocate_chemequianalysis(&self._ptr)
+
   def solve(self, double P, double T, molfracs_atoms = None, molfracs_species = None):
     """Computes chemical equilibrium given input atom or species mole fractions.
     If successful, then the equilibrium composition will be stored in a number
