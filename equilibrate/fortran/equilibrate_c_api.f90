@@ -15,17 +15,17 @@ contains
 
   !~~ Allocator and destroyer ~~!
 
-  subroutine allocate_chemequianalysis(ptr) bind(c)
+  function allocate_chemequianalysis() result(ptr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(out) :: ptr
+    type(c_ptr) :: ptr
     type(ChemEquiAnalysis), pointer :: cea
     allocate(cea)
     ptr = c_loc(cea)
-  end subroutine
+  end function
 
   subroutine deallocate_chemequianalysis(ptr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
     deallocate(cea)
@@ -37,7 +37,7 @@ contains
                                              atoms_present, atoms_dim, atoms, &
                                              species_present, species_dim, species, err) bind(c)
     use equilibrate, only: ChemEquiAnalysis, s_str_len
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     character(kind=c_char), intent(in) :: thermofile(*)
     logical(c_bool), intent(in) :: atoms_present
     integer(c_int), intent(in) :: atoms_dim
@@ -96,7 +96,7 @@ contains
                                             molfracs_species_present, molfracs_species_dim, molfracs_species, &
                                             converged, err) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     real(c_double), intent(in) :: P
     real(c_double), intent(in) :: T
     logical(c_bool), intent(in) :: molfracs_atoms_present
@@ -134,7 +134,7 @@ contains
 
   subroutine chemequianalysis_atoms_names_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -143,7 +143,7 @@ contains
   
   subroutine chemequianalysis_atoms_names_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis, s_str_len
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     character(kind=c_char), intent(out) :: arr(dim1*s_str_len+1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -163,7 +163,7 @@ contains
 
   subroutine chemequianalysis_species_names_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -172,7 +172,7 @@ contains
   
   subroutine chemequianalysis_species_names_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis, s_str_len
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     character(kind=c_char), intent(out) :: arr(dim1*s_str_len+1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -192,7 +192,7 @@ contains
 
   subroutine chemequianalysis_gas_names_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -201,7 +201,7 @@ contains
   
   subroutine chemequianalysis_gas_names_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis, s_str_len
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     character(kind=c_char), intent(out) :: arr(dim1*s_str_len+1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -221,7 +221,7 @@ contains
 
   subroutine chemequianalysis_condensate_names_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -230,7 +230,7 @@ contains
   
   subroutine chemequianalysis_condensate_names_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis, s_str_len
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     character(kind=c_char), intent(out) :: arr(dim1*s_str_len+1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -250,7 +250,7 @@ contains
 
   subroutine chemequianalysis_molfracs_atoms_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -259,7 +259,7 @@ contains
   
   subroutine chemequianalysis_molfracs_atoms_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -269,7 +269,7 @@ contains
 
   subroutine chemequianalysis_molfracs_species_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -278,7 +278,7 @@ contains
   
   subroutine chemequianalysis_molfracs_species_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -288,7 +288,7 @@ contains
 
   subroutine chemequianalysis_massfracs_species_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -297,7 +297,7 @@ contains
   
   subroutine chemequianalysis_massfracs_species_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -307,7 +307,7 @@ contains
 
   subroutine chemequianalysis_molfracs_atoms_gas_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -316,7 +316,7 @@ contains
   
   subroutine chemequianalysis_molfracs_atoms_gas_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -326,7 +326,7 @@ contains
 
   subroutine chemequianalysis_molfracs_species_gas_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -335,7 +335,7 @@ contains
   
   subroutine chemequianalysis_molfracs_species_gas_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -345,7 +345,7 @@ contains
 
   subroutine chemequianalysis_molfracs_atoms_condensate_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -354,7 +354,7 @@ contains
   
   subroutine chemequianalysis_molfracs_atoms_condensate_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -364,7 +364,7 @@ contains
 
   subroutine chemequianalysis_molfracs_species_condensate_get_size(ptr, dim1) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(out) :: dim1
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -373,7 +373,7 @@ contains
   
   subroutine chemequianalysis_molfracs_species_condensate_get(ptr, dim1, arr) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     integer(c_int), intent(in) :: dim1
     real(c_double), intent(out) :: arr(dim1)
     type(ChemEquiAnalysis), pointer :: cea
@@ -383,7 +383,7 @@ contains
 
   subroutine chemequianalysis_verbose_get(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     logical(c_bool), intent(out) :: val
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -392,7 +392,7 @@ contains
   
   subroutine chemequianalysis_verbose_set(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     logical(c_bool), intent(in) :: val
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -401,7 +401,7 @@ contains
 
   subroutine chemequianalysis_mass_tol_get(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     real(c_double), intent(out) :: val
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)
@@ -410,7 +410,7 @@ contains
   
   subroutine chemequianalysis_mass_tol_set(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
-    type(c_ptr), intent(in) :: ptr
+    type(c_ptr), value, intent(in) :: ptr
     real(c_double), intent(in) :: val
     type(ChemEquiAnalysis), pointer :: cea
     call c_f_pointer(ptr, cea)

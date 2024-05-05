@@ -3,7 +3,7 @@ cdef extern from "<stdbool.h>":
   pass
 
 # Allocate and destroy
-cdef extern void allocate_chemequianalysis(void *ptr);
+cdef extern void *allocate_chemequianalysis();
 cdef extern void deallocate_chemequianalysis(void *ptr);
 
 # Wrappers for functions

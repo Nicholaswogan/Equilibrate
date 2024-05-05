@@ -1,6 +1,7 @@
 from numpy cimport ndarray, uint8_t
 from libc.stdint cimport uintptr_t
 from libcpp cimport bool as cbool
+from cpython.object cimport PyObject_GenericSetAttr
 cimport ChemEquiAnalysis_pxd as cea_pxd
 import numpy as np
 import ctypes as ct
@@ -8,10 +9,28 @@ import os
 
 DEF S_STR_LEN = 20;
 DEF ERR_LEN = 1024;
-  
+
 cdef class ChemEquiAnalysis:
 
   cdef void *_ptr
+  cdef cbool _init_called
+
+  def __cinit__(self, thermofile = None, atoms = None, species = None):
+    self._init_called = False
+    self._ptr = cea_pxd.allocate_chemequianalysis()
+
+  def __dealloc__(self):
+    cea_pxd.deallocate_chemequianalysis(self._ptr)
+
+  def __getattribute__(self, name):
+    if not self._init_called:
+      raise EquilibrateException('The "__init__" method of ChemEquiAnalysis has not been called.')
+    return super().__getattribute__(name)
+
+  def __setattr__(self, name, value):
+    if not self._init_called:
+      raise EquilibrateException('The "__init__" method of ChemEquiAnalysis has not been called.')
+    PyObject_GenericSetAttr(self, name, value)
 
   def __init__(self, thermofile = None, atoms = None, species = None):           
     """Initializes the chemical equilibrium solver given an input thermodynamic file.
@@ -33,8 +52,8 @@ cdef class ChemEquiAnalysis:
     species : list, optional
         Names of species to include.
     """
-    # Allocate memory
-    cea_pxd.allocate_chemequianalysis(&self._ptr)
+
+    self._init_called = True
 
     # convert strings to char
     cdef bytes thermofile_b = pystring2cstring(thermofile)
@@ -61,15 +80,12 @@ cdef class ChemEquiAnalysis:
       raise EquilibrateException('"atoms" and "species" can not both be inputs.')
     
     # Initialize
-    cea_pxd.chemequianalysis_create_wrapper(&self._ptr, thermofile_c,
+    cea_pxd.chemequianalysis_create_wrapper(self._ptr, thermofile_c,
                                             &atoms_present, &atoms_dim, <char *>atoms_c.data,
                                             &species_present, &species_dim, <char *>species_c.data,
                                             err)
     if len(err.strip()) > 0:
       raise EquilibrateException(err.decode("utf-8").strip())
-
-  def __dealloc__(self):
-    cea_pxd.deallocate_chemequianalysis(&self._ptr)
 
   def solve(self, double P, double T, molfracs_atoms = None, molfracs_species = None):
     """Computes chemical equilibrium given input atom or species mole fractions.
@@ -79,13 +95,19 @@ cdef class ChemEquiAnalysis:
     Parameters
     ----------
     P : double
-      Pressure in bars
+        Pressure in bars
     T : double
-      Temperature in Kelvin
+        Temperature in Kelvin
     molfracs_atoms : ndarray[double,ndim=1], optional
-      Atom mole fractions in the same order and length as self.atoms_names.
+        Atom mole fractions in the same order and length as self.atoms_names.
     molfracs_species : ndarray[double,ndim=1], optional
-      Species mole fractions in the same order and length as self.species_names.
+        Species mole fractions in the same order and length as self.species_names.
+
+    Results
+    -------
+    converged : bool
+        If true, then the calculation successfully achieved chemical equilibrium
+        to within the specified tolerances.
     """
 
     cdef ndarray[double, ndim=1] molfracs_atoms_ = np.empty(1,dtype=np.double)
@@ -105,7 +127,7 @@ cdef class ChemEquiAnalysis:
     cdef cbool converged
     cdef char err[ERR_LEN+1]
 
-    cea_pxd.chemequianalysis_solve_wrapper(&self._ptr, &P, &T,
+    cea_pxd.chemequianalysis_solve_wrapper(self._ptr, &P, &T,
                          &molfracs_atoms_present, &molfracs_atoms_dim, <double *>molfracs_atoms_.data, 
                          &molfracs_species_present, &molfracs_species_dim, <double *>molfracs_species_.data, 
                          &converged, err)
@@ -119,109 +141,109 @@ cdef class ChemEquiAnalysis:
     "List. Names of atoms"
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_atoms_names_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_atoms_names_get_size(self._ptr, &dim1)
       cdef ndarray arr_c = np.empty(dim1*S_STR_LEN + 1, 'S1')
-      cea_pxd.chemequianalysis_atoms_names_get(&self._ptr, &dim1, <char *>arr_c.data)
+      cea_pxd.chemequianalysis_atoms_names_get(self._ptr, &dim1, <char *>arr_c.data)
       return c2stringarr(arr_c, S_STR_LEN, dim1)
 
   property species_names:
     "List. Names of species"
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_species_names_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_species_names_get_size(self._ptr, &dim1)
       cdef ndarray arr_c = np.empty(dim1*S_STR_LEN + 1, 'S1')
-      cea_pxd.chemequianalysis_species_names_get(&self._ptr, &dim1, <char *>arr_c.data)
+      cea_pxd.chemequianalysis_species_names_get(self._ptr, &dim1, <char *>arr_c.data)
       return c2stringarr(arr_c, S_STR_LEN, dim1)
 
   property gas_names:
     "List. Names of gases"
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_gas_names_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_gas_names_get_size(self._ptr, &dim1)
       cdef ndarray arr_c = np.empty(dim1*S_STR_LEN + 1, 'S1')
-      cea_pxd.chemequianalysis_gas_names_get(&self._ptr, &dim1, <char *>arr_c.data)
+      cea_pxd.chemequianalysis_gas_names_get(self._ptr, &dim1, <char *>arr_c.data)
       return c2stringarr(arr_c, S_STR_LEN, dim1)
 
   property condensate_names:
     "List. Names of condensates"
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_condensate_names_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_condensate_names_get_size(self._ptr, &dim1)
       cdef ndarray arr_c = np.empty(dim1*S_STR_LEN + 1, 'S1')
-      cea_pxd.chemequianalysis_condensate_names_get(&self._ptr, &dim1, <char *>arr_c.data)
+      cea_pxd.chemequianalysis_condensate_names_get(self._ptr, &dim1, <char *>arr_c.data)
       return c2stringarr(arr_c, S_STR_LEN, dim1)
 
   property molfracs_atoms:
     "ndarray[double,ndim=1]. Mole fractions of each atom."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_atoms_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_atoms_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_atoms_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_atoms_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property molfracs_species:
     "ndarray[double,ndim=1]. Mole fractions of each species."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_species_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_species_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_species_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_species_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property massfracs_species:
     "ndarray[double,ndim=1]. Mass fractions of each species."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_massfracs_species_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_massfracs_species_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_massfracs_species_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_massfracs_species_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property molfracs_atoms_gas:
     "ndarray[double,ndim=1]. Mole fractions of atoms in gas phase."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_atoms_gas_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_atoms_gas_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_atoms_gas_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_atoms_gas_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property molfracs_species_gas:
     "ndarray[double,ndim=1]. Mole fractions of species in gas phase."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_species_gas_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_species_gas_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_species_gas_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_species_gas_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property molfracs_atoms_condensate:
     "ndarray[double,ndim=1]. Mole fractions of atoms in condensed phase."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_atoms_condensate_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_atoms_condensate_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_atoms_condensate_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_atoms_condensate_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property molfracs_species_condensate:
     "ndarray[double,ndim=1]. Mole fractions of species in condensed phase."
     def __get__(self):
       cdef int dim1
-      cea_pxd.chemequianalysis_molfracs_species_condensate_get_size(&self._ptr, &dim1)
+      cea_pxd.chemequianalysis_molfracs_species_condensate_get_size(self._ptr, &dim1)
       cdef ndarray arr = np.empty(dim1, np.double)
-      cea_pxd.chemequianalysis_molfracs_species_condensate_get(&self._ptr, &dim1, <double *>arr.data)
+      cea_pxd.chemequianalysis_molfracs_species_condensate_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
   property verbose:
     "bool. Determines amount of printing."
     def __get__(self):
       cdef cbool val
-      cea_pxd.chemequianalysis_verbose_get(&self._ptr, &val)
+      cea_pxd.chemequianalysis_verbose_get(self._ptr, &val)
       return val
     def __set__(self, cbool val):
-      cea_pxd.chemequianalysis_verbose_set(&self._ptr, &val)
+      cea_pxd.chemequianalysis_verbose_set(self._ptr, &val)
 
   property mass_tol:
     """float. Degree to which mass will be balanced. Gordon & McBride's default 
@@ -229,10 +251,10 @@ cdef class ChemEquiAnalysis:
     """
     def __get__(self):
       cdef double val
-      cea_pxd.chemequianalysis_mass_tol_get(&self._ptr, &val)
+      cea_pxd.chemequianalysis_mass_tol_get(self._ptr, &val)
       return val
     def __set__(self, double val):
-      cea_pxd.chemequianalysis_mass_tol_set(&self._ptr, &val)
+      cea_pxd.chemequianalysis_mass_tol_set(self._ptr, &val)
 
 # version
 cdef extern void equilibrate_version_get(char *version_c)
