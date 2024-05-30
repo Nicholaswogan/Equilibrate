@@ -81,6 +81,7 @@ contains
     type(type_error), allocatable :: io_err
     
     character(:), allocatable :: tmp_str
+    character(s_str_len) :: tmp_str1
     integer :: i, j, ind
 
     !!! atoms !!!
@@ -143,17 +144,11 @@ contains
         if (allocated(io_err)) then; err = trim(filename)//trim(io_err%message); return; endif
         key_value_pair => dict%first
         do while (associated(key_value_pair))
-          ind = findloc(sp%atoms_names,trim(key_value_pair%key), 1)
+          tmp_str1 = trim(key_value_pair%key)
+          ind = findloc(sp%atoms_names,tmp_str1, 1)
           if (ind == 0) then
             err = 'The atom "'// trim(key_value_pair%key)//'" in species "'// &
-                  sp%r(j)%name//'" is not in the list of atoms: '
-            do i = 1,size(sp%atoms_names)
-              if (i == size(sp%atoms_names)) then
-                err = err//trim(sp%atoms_names(i))
-              else
-                err = err//trim(sp%atoms_names(i))//', '
-              endif
-            enddo
+                  sp%r(j)%name//'" is not in the list of atoms.'
             return
           endif
           key_value_pair =>key_value_pair%next
