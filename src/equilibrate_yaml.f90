@@ -146,7 +146,14 @@ contains
           ind = findloc(sp%atoms_names,trim(key_value_pair%key), 1)
           if (ind == 0) then
             err = 'The atom "'// trim(key_value_pair%key)//'" in species "'// &
-                  sp%r(j)%name//'" is not in the list of atoms.'
+                  sp%r(j)%name//'" is not in the list of atoms: '
+            do i = 1,size(sp%atoms_names)
+              if (i == size(sp%atoms_names)) then
+                err = err//trim(sp%atoms_names(i))
+              else
+                err = err//trim(sp%atoms_names(i))//', '
+              endif
+            enddo
             return
           endif
           key_value_pair =>key_value_pair%next
