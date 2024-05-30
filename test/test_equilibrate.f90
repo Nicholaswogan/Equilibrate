@@ -264,14 +264,14 @@ contains
       stop 1
     endif
 
-    converged = cea%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
+    converged = cea%solve(1.0e6_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
     endif
     if (.not.converged) stop 1
 
-    converged = cea2%solve(1.0_dp, 1000.0_dp, molfracs_atoms=X, err=err)
+    converged = cea2%solve(1.0e6_dp, 1000.0_dp, molfracs_atoms=X, err=err)
     if (allocated(err)) then
       print*,err
       stop 1
@@ -294,7 +294,7 @@ contains
       endif
     enddo
 
-    converged = cea%solve(1.0_dp, 1000.0_dp, molfracs_species=cea%molfracs_species, err=err)
+    converged = cea%solve(1.0e6_dp, 1000.0_dp, molfracs_species=cea%molfracs_species, err=err)
     if (allocated(err)) then
       print*,err
       stop 1

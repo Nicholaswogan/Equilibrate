@@ -163,7 +163,7 @@ contains
   !> `err` is allocated with an error message.
   function solve(self, P, T, molfracs_atoms, molfracs_species, err) result(converged)
     class(ChemEquiAnalysis), intent(inout) :: self
-    real(dp), intent(in) :: P !! Pressure in bars
+    real(dp), intent(in) :: P !! Pressure in dynes/cm^2
     real(dp), intent(in) :: T !! Temperature in Kelvin
     !> Atom mole fractions in the same order and length as self%atoms_names.
     real(dp), optional, intent(in) :: molfracs_atoms(:)
@@ -173,9 +173,11 @@ contains
     logical :: converged
 
     real(dp), allocatable :: molfracs_atoms_(:)
+    real(dp) :: P_bars
     integer :: i, j, jj
 
     converged = .false.
+    P_bars = P/1.0e6_dp
 
     if (present(molfracs_atoms) .and. present(molfracs_species)) then
       err = 'Both "molfracs_atoms" and "molfracs_species" are inputs, but only one is allowed.'
@@ -224,7 +226,7 @@ contains
                            mass_tol=self%mass_tol, &
                            molfracs_reactants=self%molfracs_species, &
                            massfracs_reactants=self%massfracs_species, &
-                           temp=T, press=P, &
+                           temp=T, press=P_bars, &
                            nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%MMW, rho=self%rho, c_pe=self%c_pe)
     if (self%dat%error) then
       err = trim(self%dat%err_msg)

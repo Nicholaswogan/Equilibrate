@@ -95,7 +95,7 @@ cdef class ChemEquiAnalysis:
     Parameters
     ----------
     P : double
-        Pressure in bars
+        Pressure in dynes/cm^2
     T : double
         Temperature in Kelvin
     molfracs_atoms : ndarray[double,ndim=1], optional
