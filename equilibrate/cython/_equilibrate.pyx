@@ -12,7 +12,7 @@ DEF ERR_LEN = 1024;
 
 cdef class ChemEquiAnalysis:
 
-  cdef void *_ptr
+  cdef cea_pxd.ChemEquiAnalysis *_ptr
   cdef cbool _init_called
 
   def __cinit__(self, thermofile = None, atoms = None, species = None):
