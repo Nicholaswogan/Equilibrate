@@ -137,6 +137,47 @@ cdef class ChemEquiAnalysis:
 
     return converged
 
+  def solve_metallicity(self, double P, double T, double metallicity, CtoO = None):
+    """Computes chemical equilibrium given an input metallicity and, optionally,
+    a C/O ratio. If successful, then the equilibrium composition will be stored in a number
+    of attributes (e.g., self%molfracs_species).
+
+    Parameters
+    ----------
+    P : double
+        Pressure in dynes/cm^2
+    T : double
+        Temperature in Kelvin
+    metallicity : double
+        Metallicity relative to the Sun
+    CtoO : double, optional
+        The C/O ratio relative to solar. CtoO = 1 would be the same composition as solar.
+
+    Results
+    -------
+    converged : bool
+        If true, then the calculation successfully achieved chemical equilibrium
+        to within the specified tolerances.
+    """
+
+    cdef double CtoO_ = 1.0
+    cdef cbool CtoO_present = False
+    if CtoO is not None:
+      CtoO_present = True
+      CtoO_ = CtoO
+
+    cdef cbool converged
+    cdef char err[ERR_LEN+1]
+
+    cea_pxd.chemequianalysis_solve_metallicity_wrapper(self._ptr, &P, &T,
+                         &metallicity, &CtoO_present, &CtoO_, 
+                         &converged, err)
+
+    if len(err.strip()) > 0:
+      raise EquilibrateException(err.decode("utf-8").strip())
+
+    return converged
+
   property atoms_names:
     "List. Names of atoms"
     def __get__(self):
@@ -172,6 +213,21 @@ cdef class ChemEquiAnalysis:
       cdef ndarray arr_c = np.empty(dim1*S_STR_LEN + 1, 'S1')
       cea_pxd.chemequianalysis_condensate_names_get(self._ptr, &dim1, <char *>arr_c.data)
       return c2stringarr(arr_c, S_STR_LEN, dim1)
+
+  property molfracs_atoms_sun:
+    "ndarray[double,ndim=1]. Assumed mole fractions of each atom in the Sun."
+    def __get__(self):
+      cdef int dim1
+      cea_pxd.chemequianalysis_molfracs_atoms_sun_get_size(self._ptr, &dim1)
+      cdef ndarray arr = np.empty(dim1, np.double)
+      cea_pxd.chemequianalysis_molfracs_atoms_sun_get(self._ptr, &dim1, <double *>arr.data)
+      return arr
+    def __set__(self,ndarray[double, ndim=1] arr):
+      cdef int dim1
+      cea_pxd.chemequianalysis_molfracs_atoms_sun_get_size(self._ptr, &dim1)
+      if arr.shape[0] != dim1:
+        raise EquilibrateException("Input array is the wrong size.")
+      cea_pxd.chemequianalysis_molfracs_atoms_sun_set(self._ptr, &dim1, <double *>arr.data)
 
   property molfracs_atoms:
     "ndarray[double,ndim=1]. Mole fractions of each atom."

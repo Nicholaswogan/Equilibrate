@@ -16,6 +16,9 @@ module equilibrate
     !> Describes the composition of each species (i.e., how many atoms)
     real(dp), allocatable, private :: species_composition(:,:)
 
+    !> Composition of the Sun.
+    real(dp), allocatable :: molfracs_atoms_sun(:)
+
     ! All below are results of an equilibrium solve.
 
     real(dp), allocatable :: molfracs_atoms(:) !! Mole fractions of each atom (size(atoms_names))
@@ -42,6 +45,7 @@ module equilibrate
 
   contains
     procedure :: solve
+    procedure :: solve_metallicity
   end type
   interface ChemEquiAnalysis
     module procedure :: create_ChemEquiAnalysis
@@ -155,12 +159,26 @@ contains
       enddo
     enddo
 
+    block
+      use equilibrate_const, only: atoms_sun, molfracs_atoms_sun
+      integer :: ind
+      ! Default composition of Sun
+      allocate(cea%molfracs_atoms_sun(size(cea%atoms_names)))
+      cea%molfracs_atoms_sun = 1.0e-50_dp
+      do i = 1,size(cea%atoms_names)
+        ind = findloc(atoms_sun, cea%atoms_names(i), 1)
+        if (ind /= 0) then
+          cea%molfracs_atoms_sun(i) = molfracs_atoms_sun(ind)
+        endif
+      enddo
+      cea%molfracs_atoms_sun = cea%molfracs_atoms_sun/sum(cea%molfracs_atoms_sun)
+    endblock
+
   end function
 
   !> Computes chemical equilibrium given input atom or species mole fractions.
   !> If successful, then the equilibrium composition will be stored in a number
-  !> of attributes (e.g., self%molfracs_species). If unsuccessful, then the variable
-  !> `err` is allocated with an error message.
+  !> of attributes (e.g., self%molfracs_species).
   function solve(self, P, T, molfracs_atoms, molfracs_species, err) result(converged)
     class(ChemEquiAnalysis), intent(inout) :: self
     real(dp), intent(in) :: P !! Pressure in dynes/cm^2
@@ -270,6 +288,68 @@ contains
     self%molfracs_atoms = self%molfracs_atoms/max(sum(self%molfracs_atoms),tiny(1.0_dp))
     self%molfracs_atoms_condensate = self%molfracs_atoms_condensate/max(sum(self%molfracs_atoms_condensate),tiny(1.0_dp))
     self%molfracs_atoms_gas = self%molfracs_atoms_gas/max(sum(self%molfracs_atoms_gas),tiny(1.0_dp))
+
+  end function
+
+  !> Computes chemical equilibrium given an input metallicity and, optionally,
+  !> a C/O ratio. If successful, then the equilibrium composition will be stored in a number
+  !> of attributes (e.g., self%molfracs_species).
+  function solve_metallicity(self, P, T, metallicity, CtoO, err) result(converged)
+    class(ChemEquiAnalysis), intent(inout) :: self
+    real(dp), intent(in) :: P !! Pressure in dynes/cm^2
+    real(dp), intent(in) :: T !! Temperature in Kelvin
+    real(dp), intent(in) :: metallicity !! Metallicity relative to the Sun
+    !> The C/O ratio relative to solar. CtoO = 1 would be the same
+    !> composition as solar.
+    real(dp), optional, intent(in) :: CtoO
+    character(:), allocatable, intent(out) :: err
+    logical :: converged
+
+    real(dp), allocatable :: molfracs_atoms(:)
+    integer :: i, indC, indO
+    real(dp) :: x, a
+
+    if (metallicity <= 0) then
+      err = '"metallicity" must be greater than 0.'
+      return
+    endif
+
+    ! Compute atoms based on the input metallicity.
+    molfracs_atoms = self%molfracs_atoms_sun
+    do i = 1,size(molfracs_atoms)
+      if (self%atoms_names(i) /= 'H' .or. self%atoms_names(i) /= 'He') then
+        molfracs_atoms(i) = self%molfracs_atoms_sun(i)*metallicity
+      endif
+    enddo
+    molfracs_atoms = molfracs_atoms/sum(molfracs_atoms)
+
+    ! Adjust C/O ratio, if specified
+    if (present(CtoO)) then
+      if (CtoO <= 0) then
+        err = '"CtoO" must be greater than 0.'
+        return
+      endif
+
+      indC = findloc(self%atoms_names, 'C', 1)
+      if (indC == 0) then
+        err = 'C must be an atom if CtoO is specified.'
+        return
+      endif
+
+      indO = findloc(self%atoms_names, 'O', 1)
+      if (indO == 0) then
+        err = 'O must be an atom if CtoO is specified.'
+        return
+      endif
+
+      x = CtoO*(molfracs_atoms(indC)/molfracs_atoms(indO))
+      a = (x*molfracs_atoms(indO) - molfracs_atoms(indC))/(1 + x)
+      molfracs_atoms(indC) = molfracs_atoms(indC) + a
+      molfracs_atoms(indO) = molfracs_atoms(indO) - a
+    endif
+
+    converged = self%solve(P, T, molfracs_atoms=molfracs_atoms, err=err)
+    if (allocated(err)) return
 
   end function
 

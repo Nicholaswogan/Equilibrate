@@ -309,6 +309,21 @@ contains
       endif
     enddo
 
+    converged = cea%solve_metallicity(1.0e6_dp, 1000.0_dp, 1.0_dp, err=err)
+    if (allocated(err)) then
+      print*,err
+      stop 1
+    endif
+    if (.not.converged) stop 1
+
+    do i = 1,size(cea%molfracs_species)
+      if (.not.is_close(cea%molfracs_species(i),correct_answer(i),tol=1.0e-4_dp) .and. cea%molfracs_species(i) > 1.0e-50_dp) then
+        print*,cea%molfracs_species(i),correct_answer(i)
+        print*,'ChemEquiAnalysis failed to compute the right equilibrium.'
+        stop 1
+      endif
+    enddo
+
     print*,'test passed.'
 
   end subroutine

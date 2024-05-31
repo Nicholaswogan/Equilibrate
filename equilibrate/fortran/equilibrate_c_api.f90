@@ -130,6 +130,37 @@ contains
 
   end subroutine
 
+  subroutine chemequianalysis_solve_metallicity_wrapper(ptr, P, T, &
+                                                        metallicity, CtoO_present, CtoO, &
+                                                        converged, err) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    real(c_double), intent(in) :: P
+    real(c_double), intent(in) :: T
+    real(c_double), intent(in) :: metallicity
+    logical(c_bool), intent(in) :: CtoO_present
+    real(c_double), intent(in) :: CtoO
+    logical(c_bool), intent(out) :: converged
+    character(kind=c_char), intent(out) :: err(err_len+1)
+
+    character(:), allocatable :: err_f
+    type(ChemEquiAnalysis), pointer :: cea
+
+    call c_f_pointer(ptr, cea)
+
+    if (CtoO_present) then
+      converged = cea%solve_metallicity(P, T, metallicity, CtoO=CtoO, err=err_f)
+    else
+      converged = cea%solve_metallicity(P, T, metallicity, err=err_f)
+    endif
+
+    err(1) = c_null_char
+    if (allocated(err_f)) then
+      call copy_string_ftoc(err_f, err)
+    endif
+
+  end subroutine
+
   !~~ Getters and setters ~~!
 
   subroutine chemequianalysis_atoms_names_get_size(ptr, dim1) bind(c)
@@ -246,6 +277,35 @@ contains
     enddo
     arr(dim1*s_str_len+1) = c_null_char
     
+  end subroutine
+
+  subroutine chemequianalysis_molfracs_atoms_sun_get_size(ptr, dim1) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    integer(c_int), intent(out) :: dim1
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    dim1 = size(cea%molfracs_atoms_sun)
+  end subroutine
+  
+  subroutine chemequianalysis_molfracs_atoms_sun_get(ptr, dim1, arr) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    integer(c_int), intent(in) :: dim1
+    real(c_double), intent(out) :: arr(dim1)
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    arr = cea%molfracs_atoms_sun
+  end subroutine
+
+  subroutine chemequianalysis_molfracs_atoms_sun_set(ptr, dim1, arr) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    integer(c_int), intent(in) :: dim1
+    real(c_double), intent(out) :: arr(dim1)
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    cea%molfracs_atoms_sun = arr
   end subroutine
 
   subroutine chemequianalysis_molfracs_atoms_get_size(ptr, dim1) bind(c)

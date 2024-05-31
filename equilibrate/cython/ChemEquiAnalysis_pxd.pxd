@@ -20,6 +20,9 @@ cdef extern void chemequianalysis_solve_wrapper(ChemEquiAnalysis *ptr, double *P
                          cbool *molfracs_atoms_present, int *molfracs_atoms_dim, double *molfracs_atoms, 
                          cbool *molfracs_species_present, int *molfracs_species_dim, double *molfracs_species, 
                          cbool *converged, char *err)
+cdef extern void chemequianalysis_solve_metallicity_wrapper(ChemEquiAnalysis *ptr, double *P, double *T,
+                         double *metallicity, cbool *CtoO_present, double *CtoO, 
+                         cbool *converged, char *err)
 
 # Getters and setters
 
@@ -34,6 +37,10 @@ cdef extern void chemequianalysis_gas_names_get(ChemEquiAnalysis *ptr, int *dim1
 
 cdef extern void chemequianalysis_condensate_names_get_size(ChemEquiAnalysis *ptr, int *dim1)
 cdef extern void chemequianalysis_condensate_names_get(ChemEquiAnalysis *ptr, int *dim1, char* arr)
+
+cdef extern void chemequianalysis_molfracs_atoms_sun_get_size(ChemEquiAnalysis *ptr, int *dim1)
+cdef extern void chemequianalysis_molfracs_atoms_sun_get(ChemEquiAnalysis *ptr, int *dim1, double *arr)
+cdef extern void chemequianalysis_molfracs_atoms_sun_set(ChemEquiAnalysis *ptr, int *dim1, double *arr)
 
 cdef extern void chemequianalysis_molfracs_atoms_get_size(ChemEquiAnalysis *ptr, int *dim1)
 cdef extern void chemequianalysis_molfracs_atoms_get(ChemEquiAnalysis *ptr, int *dim1, double *arr)
