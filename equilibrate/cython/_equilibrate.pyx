@@ -15,7 +15,7 @@ cdef class ChemEquiAnalysis:
   cdef cea_pxd.ChemEquiAnalysis *_ptr
   cdef cbool _init_called
 
-  def __cinit__(self, thermofile = None, atoms = None, species = None):
+  def __cinit__(self, *args, **kwargs):
     self._init_called = False
     self._ptr = cea_pxd.allocate_chemequianalysis()
 
