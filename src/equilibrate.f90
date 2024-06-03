@@ -317,7 +317,7 @@ contains
     ! Compute atoms based on the input metallicity.
     molfracs_atoms = self%molfracs_atoms_sun
     do i = 1,size(molfracs_atoms)
-      if (self%atoms_names(i) /= 'H' .or. self%atoms_names(i) /= 'He') then
+      if (self%atoms_names(i) /= 'H' .and. self%atoms_names(i) /= 'He') then
         molfracs_atoms(i) = self%molfracs_atoms_sun(i)*metallicity
       endif
     enddo
