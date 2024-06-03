@@ -33,7 +33,9 @@ module equilibrate
                                                             !! phase (size(condensate_names))
 
     ! A few undocumented outputs.
-    real(dp) :: nabla_ad, gamma2, MMW, rho, c_pe
+    real(dp) :: nabla_ad, gamma2, rho, c_pe
+
+    real(dp) :: mubar !! Mean molecular weight
 
     logical :: verbose = .false. !! Determines amount of printing.
     real(dp) :: mass_tol = 1.0e-2_dp !! Degree to which mass will be balanced. 
@@ -245,7 +247,7 @@ contains
                            molfracs_reactants=self%molfracs_species, &
                            massfracs_reactants=self%massfracs_species, &
                            temp=T, press=P_bars, &
-                           nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%MMW, rho=self%rho, c_pe=self%c_pe)
+                           nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%mubar, rho=self%rho, c_pe=self%c_pe)
     if (self%dat%error) then
       err = trim(self%dat%err_msg)
       return

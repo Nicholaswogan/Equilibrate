@@ -441,6 +441,15 @@ contains
     arr = cea%molfracs_species_condensate
   end subroutine
 
+  subroutine chemequianalysis_mubar_get(ptr, val) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    real(c_double), intent(out) :: val
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    val = cea%mubar
+  end subroutine
+
   subroutine chemequianalysis_verbose_get(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
     type(c_ptr), value, intent(in) :: ptr

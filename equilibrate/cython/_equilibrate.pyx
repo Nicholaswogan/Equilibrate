@@ -292,6 +292,13 @@ cdef class ChemEquiAnalysis:
       cea_pxd.chemequianalysis_molfracs_species_condensate_get(self._ptr, &dim1, <double *>arr.data)
       return arr
 
+  property mubar:
+    "float. Mean molecular weight (g/mol)."
+    def __get__(self):
+      cdef double val
+      cea_pxd.chemequianalysis_mubar_get(self._ptr, &val)
+      return val
+
   property verbose:
     "bool. Determines amount of printing."
     def __get__(self):

@@ -63,6 +63,8 @@ cdef extern void chemequianalysis_molfracs_atoms_condensate_get(ChemEquiAnalysis
 cdef extern void chemequianalysis_molfracs_species_condensate_get_size(ChemEquiAnalysis *ptr, int *dim1)
 cdef extern void chemequianalysis_molfracs_species_condensate_get(ChemEquiAnalysis *ptr, int *dim1, double *arr)
 
+cdef extern void chemequianalysis_mubar_get(ChemEquiAnalysis *ptr, double *val)
+
 cdef extern void chemequianalysis_verbose_get(ChemEquiAnalysis *ptr, cbool *val)
 cdef extern void chemequianalysis_verbose_set(ChemEquiAnalysis *ptr, cbool *val)
 
