@@ -11,6 +11,8 @@ DEF S_STR_LEN = 20;
 DEF ERR_LEN = 1024;
 
 cdef class ChemEquiAnalysis:
+  """A chemical equilibrium solver.
+  """
 
   cdef cea_pxd.ChemEquiAnalysis *_ptr
   cdef cbool _init_called
@@ -32,7 +34,7 @@ cdef class ChemEquiAnalysis:
       raise EquilibrateException('The "__init__" method of ChemEquiAnalysis has not been called.')
     PyObject_GenericSetAttr(self, name, value)
 
-  def __init__(self, thermofile = None, atoms = None, species = None):           
+  def __init__(self, str thermofile, atoms = None, species = None):           
     """Initializes the chemical equilibrium solver given an input thermodynamic file.
     The file can only have ".yaml" format. `atoms` and `species` are optional inputs 
     with the following effects:
