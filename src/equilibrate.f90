@@ -10,8 +10,11 @@ module equilibrate
   type :: ChemEquiAnalysis
     character(atom_str_len), allocatable :: atoms_names(:) !! Names of atoms
     character(reac_str_len), allocatable :: species_names(:) !! Names of species
+    real(dp), allocatable :: species_mass(:) !! Molar mass of species (g/mol)
     character(reac_str_len), allocatable :: gas_names(:) !! Names of gases
+    real(dp), allocatable :: gas_mass(:) !! molar mass of gases (g/mol)
     character(reac_str_len), allocatable :: condensate_names(:) !! Names of condensates
+    real(dp), allocatable :: condensate_mass(:) !! molar mass of condensates (g/mol)
 
     !> Describes the composition of each species (i.e., how many atoms)
     real(dp), allocatable, private :: species_composition(:,:)
@@ -35,7 +38,7 @@ module equilibrate
     ! A few undocumented outputs.
     real(dp) :: nabla_ad, gamma2, rho, c_pe
 
-    real(dp) :: mubar !! Mean molecular weight
+    real(dp) :: mubar !! Mean molecular weight of gas
 
     logical :: verbose = .false. !! Determines amount of printing.
     real(dp) :: mass_tol = 1.0e-2_dp !! Degree to which mass will be balanced. 
@@ -108,17 +111,22 @@ contains
 
     cea%atoms_names = cea%dat%names_atoms(1:size(cea%dat%names_atoms)-1) ! skip E
     cea%species_names = cea%dat%names_reactants_orig
+    cea%species_mass = cea%dat%mol_weight
 
     allocate(cea%condensate_names(cea%dat%N_cond))
     allocate(cea%gas_names(cea%dat%N_gas))
+    allocate(cea%condensate_mass(cea%dat%N_cond))
+    allocate(cea%gas_mass(cea%dat%N_gas))
     j = 1
     jj = 1
     do i = 1,size(cea%species_names)
       if (cea%dat%reac_condensed(i)) then
         cea%condensate_names(j) = cea%species_names(i)
+        cea%condensate_mass(j) = cea%species_mass(i)
         j = j + 1
       else
         cea%gas_names(jj) = cea%species_names(i)
+        cea%gas_mass(jj) = cea%species_mass(i)
         jj = jj + 1
       endif
     enddo
@@ -290,6 +298,9 @@ contains
     self%molfracs_atoms = self%molfracs_atoms/max(sum(self%molfracs_atoms),tiny(1.0_dp))
     self%molfracs_atoms_condensate = self%molfracs_atoms_condensate/max(sum(self%molfracs_atoms_condensate),tiny(1.0_dp))
     self%molfracs_atoms_gas = self%molfracs_atoms_gas/max(sum(self%molfracs_atoms_gas),tiny(1.0_dp))
+
+    ! Compute mean molecular weight in gas
+    self%mubar = sum(self%molfracs_species_gas*self%gas_mass)
 
   end function
 
