@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION "3.14")
 
-project(EQUILIBRATE LANGUAGES Fortran C VERSION "0.1.5")
+project(EQUILIBRATE LANGUAGES Fortran C VERSION "0.1.6")
 
 set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/modules")
 include(cmake/CPM.cmake)
