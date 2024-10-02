@@ -153,9 +153,10 @@ contains
     ! Get composition of each species
     cea%species_composition = 0.0_dp
     do j = 1,size(cea%species_names)
+      jj = cea%dat%id_reactants(j,1)
       do k = 1,size(cea%dat%reac_atoms_id,1)
-        if (cea%dat%reac_atoms_id(k,j) > 0) then
-          i = findloc(cea%dat%id_atoms, cea%dat%reac_atoms_id(k, j), 1)
+        if (cea%dat%reac_atoms_id(k,jj) > 0) then
+          i = findloc(cea%dat%id_atoms, cea%dat%reac_atoms_id(k,jj), 1)
           if (i == 0 .or. i > size(cea%atoms_names) + 1) then
             err = 'Indexing error during initialization.'
             return
@@ -164,7 +165,7 @@ contains
             ! Electron so we skip
             cycle
           endif
-          cea%species_composition(i,j) = cea%dat%reac_stoich(k,j)
+          cea%species_composition(i,j) = cea%dat%reac_stoich(k,jj)
         endif
       enddo
     enddo
