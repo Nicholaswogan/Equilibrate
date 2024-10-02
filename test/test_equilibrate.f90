@@ -4,6 +4,7 @@ program main
 
   call test()
   call test_memory()
+  call test_nasa7()
 
 contains
 
@@ -351,6 +352,39 @@ contains
     deallocate(cea)
 
     print*,'test_memory passed.'
+
+  end subroutine
+
+  subroutine test_nasa7()
+    use equilibrate_cea, only: entropy_nasa7, enthalpy_nasa7, heat_capacity_nasa7
+    type(ChemEquiAnalysis) :: cea
+    character(:), allocatable :: err
+    logical :: converged
+    real(dp) :: entropy, enthalpy, heat_capacity
+    real(dp), allocatable :: coeffs(:)
+
+    cea = ChemEquiAnalysis('../test/photochem_thermo.yaml', err=err)
+    if (allocated(err)) then
+      print*,err
+      stop 1
+    endif
+
+    converged = cea%solve_metallicity(1.0e6_dp, 1000.0_dp, 1.0_dp, err=err)
+    if (allocated(err)) then
+      print*,err
+      stop 1
+    endif
+    if (.not.converged) stop 1
+
+    coeffs = [-18.42562_dp, 0.1279622_dp, -0.000241671_dp, 2.073899e-07_dp, -6.684715e-11_dp, -107350.5_dp, 81.90459_dp]
+    entropy = entropy_nasa7(coeffs, 900.0_dp)
+    if (.not. is_close(entropy, 110.471033963557_dp)) stop 1
+    enthalpy = enthalpy_nasa7(coeffs, 900.0_dp)
+    if (.not. is_close(enthalpy, -870626.2619052551_dp)) stop 1
+    heat_capacity = heat_capacity_nasa7(coeffs, 900.0_dp)
+    if (.not. is_close(heat_capacity, 69.14032042926877_dp)) stop 1
+
+    print*,'test_nasa7 passed.'
 
   end subroutine
 

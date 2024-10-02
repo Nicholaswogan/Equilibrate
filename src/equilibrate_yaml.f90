@@ -3,12 +3,13 @@ module equilibrate_yaml
   implicit none
   private
 
-  public :: ReactantList, ShomatePolynomial, Nasa9Polynomial, check_for_duplicates
+  public :: ReactantList, ShomatePolynomial, Nasa9Polynomial, Nasa7Polynomial, check_for_duplicates
 
   enum, bind(c)
   enumerator :: &
     ShomatePolynomial = 1, &
-    Nasa9Polynomial = 2
+    Nasa9Polynomial = 2, &
+    Nasa7Polynomial = 3
   end enum
   
   type :: ThermodynamicData
@@ -240,8 +241,10 @@ contains
       thermo%dtype = ShomatePolynomial
     elseif (model == "NASA9") then
       thermo%dtype = Nasa9Polynomial
+    elseif (model == "NASA7") then
+      thermo%dtype = Nasa7Polynomial
     else
-      err = "Thermodynamic data must be in Shomate or NASA9 format for "//trim(molecule_name)
+      err = "Thermodynamic data must be in Shomate, NASA9 or NASA7 format for "//trim(molecule_name)
       return
     endif
     
@@ -289,6 +292,8 @@ contains
     elseif (thermo%dtype == Nasa9Polynomial) then
       ! NASA9
       allocate(thermo%data(9,thermo%ntemps))
+    elseif (thermo%dtype == Nasa7Polynomial) then
+      allocate(thermo%data(7,thermo%ntemps))
     endif
     
     k = 1

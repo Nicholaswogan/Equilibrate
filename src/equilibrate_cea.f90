@@ -5,6 +5,7 @@ module equilibrate_cea
    private
 
    public :: CEAData
+   public :: entropy_nasa7, enthalpy_nasa7, heat_capacity_nasa7
 
    type :: CEAData
 
@@ -299,7 +300,7 @@ contains
    end subroutine SET_DATA
 
    subroutine read_thermo_yaml(self, rl, fpath)
-      use equilibrate_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial
+      use equilibrate_yaml, only: ReactantList, ShomatePolynomial, Nasa9Polynomial, Nasa7Polynomial
       class(CEAData), intent(inout) :: self
       type(ReactantList), intent(in) :: rl
       character(*), intent(in) :: fpath
@@ -407,6 +408,8 @@ contains
                      self%thermo_data(1:9,k,i) = rl%r(j)%thermo%data(:,k)
                      self%thermo_data(9:10,k,i) = self%thermo_data(8:9,k,i) 
                      self%thermo_data(8,k,i) = 0.0_dp
+                  elseif (rl%r(j)%thermo%dtype == Nasa7Polynomial) then
+                     self%thermo_data(1:7,k,i) = rl%r(j)%thermo%data(:,k)
                   endif
                enddo
 
@@ -749,7 +752,7 @@ contains
    !> Computes the values of C_P_0, H_0 and S_0
    subroutine ec_COMP_THERMO_QUANTS(self,temp,N_reac,C_P_0, H_0, S_0)
       use equilibrate_const, only: R
-      use equilibrate_yaml, only: ShomatePolynomial, Nasa9Polynomial
+      use equilibrate_yaml, only: ShomatePolynomial, Nasa9Polynomial, Nasa7Polynomial
       !! I/O
       class(CEAData), intent(inout) :: self
       real(dp), intent(in)  :: temp
@@ -805,6 +808,12 @@ contains
          H_0(i_reac) = enthalpy_shomate(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/mol
          S_0(i_reac) = entropy_shomate(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/(K*mol)
 
+         elseif (self%thermo_data_kind(i_reac) == Nasa7Polynomial) then
+
+         C_P_0(i_reac) = heat_capacity_nasa7(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/(K*mol)
+         H_0(i_reac) = enthalpy_nasa7(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/mol
+         S_0(i_reac) = entropy_nasa7(self%thermo_data(1:7,tempinv_ind,i_reac), temp) ! J/(K*mol)
+
          endif
 
       end do
@@ -848,6 +857,77 @@ contains
       entropy = coeffs(1)*log(TT) + coeffs(2)*TT &
                + (coeffs(3)*TT**2)/2.0_dp + (coeffs(4)*TT**3)/3.0_dp &
                - coeffs(5)/(2.0_dp * TT**2) + coeffs(7)
+   end function
+
+   pure function heat_capacity_nasa7(coeffs, T) result(cp)
+      use equilibrate_const, only: R
+      real(dp), intent(in) :: coeffs(:)
+      real(dp), intent(in) :: T
+      real(dp) :: cp !! J/(mol K)
+
+      real(dp) :: a0, a1, a2, a3, a4
+
+      a0 = coeffs(1)
+      a1 = coeffs(2)
+      a2 = coeffs(3)
+      a3 = coeffs(4)
+      a4 = coeffs(5)
+
+      cp = a0 + a1*T + a2*T**2.0_dp + a3*T**3.0_dp + a4*T**4.0_dp
+      cp = cp*R
+
+   end function
+
+   pure function enthalpy_nasa7(coeffs, T) result(enthalpy)
+      use equilibrate_const, only: R
+      real(dp), intent(in) :: coeffs(:)
+      real(dp), intent(in) :: T
+      real(dp) :: enthalpy !! J/mol
+
+      real(dp) :: a0, a1, a2, a3, a4, a5
+
+      a0 = coeffs(1)
+      a1 = coeffs(2)
+      a2 = coeffs(3)
+      a3 = coeffs(4)
+      a4 = coeffs(5)
+      a5 = coeffs(6)
+
+      enthalpy = &
+        a0 + &
+        a1*T/2.0_dp + &
+        a2*T**2.0_dp/3.0_dp + &
+        a3*T**3.0_dp/4.0_dp + &
+        a4*T**4.0_dp/5.0_dp + &
+        a5/T
+      enthalpy = enthalpy*R*T
+  
+   end function
+
+   pure function entropy_nasa7(coeffs, T) result(entropy)
+      use equilibrate_const, only: R
+      real(dp), intent(in) :: coeffs(:)
+      real(dp), intent(in) :: T
+      real(dp) :: entropy !! J/(mol K)
+
+      real(dp) :: a0, a1, a2, a3, a4, a6
+
+      a0 = coeffs(1)
+      a1 = coeffs(2)
+      a2 = coeffs(3)
+      a3 = coeffs(4)
+      a4 = coeffs(5)
+      a6 = coeffs(7)
+      
+      entropy = &
+        a0*log(T) + &
+        a1*T + &
+        a2*T**2.0_dp/2.0_dp + &
+        a3*T**3.0_dp/3.0_dp + &
+        a4*T**4.0_dp/4.0_dp + &
+        a6
+      entropy = entropy*R
+
    end function
 
    !> Computes the specie abundances (molar and mass)
