@@ -111,7 +111,10 @@ contains
 
     cea%atoms_names = cea%dat%names_atoms(1:size(cea%dat%names_atoms)-1) ! skip E
     cea%species_names = cea%dat%names_reactants_orig
-    cea%species_mass = cea%dat%mol_weight
+    allocate(cea%species_mass(size(cea%dat%mol_weight)))
+    do i = 1,size(cea%species_mass)
+      cea%species_mass(i) = cea%dat%mol_weight(cea%dat%id_reactants(i,1))
+    enddo
 
     allocate(cea%condensate_names(cea%dat%N_cond))
     allocate(cea%gas_names(cea%dat%N_gas))
