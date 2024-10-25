@@ -1,9 +1,9 @@
 
 CPMAddPackage(
   NAME fortran-yaml-c
-  VERSION 0.2.4
+  VERSION 0.2.6
   GITHUB_REPOSITORY "Nicholaswogan/fortran-yaml-c"
-  GIT_TAG "v0.2.4"
+  GIT_TAG "v0.2.6"
   EXCLUDE_FROM_ALL ON
 )
 
