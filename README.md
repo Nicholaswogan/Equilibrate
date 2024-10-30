@@ -4,4 +4,4 @@
 
 If this code is used in an academic publication, please cite Gordon and McBride (1994). Also, cite EasyChem in the following way
 
-> Lei and Mollière (2024), in prep. https://easychem.readthedocs.io/en/latest/.
+> Lei and Mollière (2024). https://arxiv.org/abs/2410.21364.
