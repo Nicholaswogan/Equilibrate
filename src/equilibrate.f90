@@ -41,7 +41,7 @@ module equilibrate
     real(dp) :: mubar !! Mean molecular weight of gas
 
     logical :: verbose = .false. !! Determines amount of printing.
-    real(dp) :: mass_tol = 1.0e-2_dp !! Degree to which mass will be balanced. 
+    real(dp) :: mass_tol = 1.0e-6_dp !! Degree to which mass will be balanced. 
                                      !! Gordon & McBride's default is 1.0e-6, but
                                      !! it seems like 1.0e-2 is OK.
 

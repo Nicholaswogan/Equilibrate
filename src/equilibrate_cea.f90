@@ -1617,7 +1617,7 @@ contains
 
       ! IONS
       INTEGER                      :: i_ion, i_stoich
-      real(dp)             :: pi_ion, pi_ion_norm
+      real(dp)             :: pi_ion, pi_ion_norm, mass
 
       ! MASS BALANCE CHECKS
       real(dp)             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
@@ -1752,9 +1752,16 @@ contains
 
       mval_mass_good = MAXVAL(b_0)*self%mass_tol
       DO i_atom = 1, N_atoms_use
-         IF ((abs(b_0(i_atom)-sum(a(1:N_species,i_atom)*n_spec(1:N_species))) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
-            mass_good = .FALSE.
-         END IF
+        mass = 0.0_dp
+        do i_reac = 1,self%N_gas
+          mass = mass + a(i_reac,i_atom)*n_spec(i_reac)
+        enddo
+        do i_reac = self%N_gas+1, N_species
+          mass = mass + a(i_reac,i_atom)*n_spec(solid_indices(i_reac-self%N_gas))
+        enddo
+        IF ((abs(b_0(i_atom) - mass) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
+          mass_good = .FALSE.
+        END IF
       END DO
 
       DO i_atom = 1, N_atoms_use
@@ -2056,7 +2063,7 @@ contains
 
       ! IONS
       INTEGER                      :: i_ion, i_stoich
-      real(dp)             :: pi_ion, pi_ion_norm
+      real(dp)             :: pi_ion, pi_ion_norm, mass
 
       ! MASS BALANCE CHECKS
       real(dp)             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
@@ -2183,9 +2190,16 @@ contains
 
       mval_mass_good = MAXVAL(b_0)*self%mass_tol
       DO i_atom = 1, N_atoms_use
-         IF ((abs(b_0(i_atom)-sum(a(1:N_species,i_atom)*n_spec(1:N_species))) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
-            mass_good = .FALSE.
-         END IF
+        mass = 0.0_dp
+        do i_reac = 1,self%N_gas
+          mass = mass + a(i_reac,i_atom)*n_spec(i_reac)
+        enddo
+        do i_reac = self%N_gas+1, N_species
+          mass = mass + a(i_reac,i_atom)*n_spec(solid_indices(i_reac-self%N_gas))
+        enddo
+        IF ((abs(b_0(i_atom) - mass) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
+          mass_good = .FALSE.
+        END IF
       END DO
 
       DO i_atom = 1, N_atoms_use
