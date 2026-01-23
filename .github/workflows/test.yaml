@@ -19,17 +19,29 @@ jobs:
         compiler: gcc
         version: 13
 
-    - name: Setup Python
-      uses: actions/setup-python@v3
+    - uses: mamba-org/setup-micromamba@v2
       with:
-        python-version: 3.9
+        environment-name: test-env
+        create-args: >-
+          python 
+          numpy 
+          scikit-build 
+          cmake=3 
+          ninja 
+          cython 
+          fypp 
+          pip 
+          c-compiler 
+          cxx-compiler 
+          fortran-compiler
 
-    - name: Install dependencies
+    - name: Install Valgrind
       run: |
-        sudo apt update && sudo apt install -y valgrind
+        sudo apt install valgrind
 
     - name: configure cmake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: |
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_PREFIX_PATH=$CONDA_PREFIX
 
     - name: build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
@@ -40,7 +52,9 @@ jobs:
         valgrind --error-exitcode=1 --leak-check=full ./test/test_equilibrate
 
     - name: build python
-      run: python -m pip install . -v
+      run: |
+        export CMAKE_ARGS="-DCMAKE_PREFIX_PATH=$CONDA_PREFIX -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+        python -m pip install --no-deps --no-build-isolation . -v
 
     - name: test python
       working-directory: ${{github.workspace}}/test
