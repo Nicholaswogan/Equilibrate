@@ -68,5 +68,8 @@ cdef extern void chemequianalysis_mubar_get(ChemEquiAnalysis *ptr, double *val)
 cdef extern void chemequianalysis_verbose_get(ChemEquiAnalysis *ptr, cbool *val)
 cdef extern void chemequianalysis_verbose_set(ChemEquiAnalysis *ptr, cbool *val)
 
+cdef extern void chemequianalysis_use_prev_guess_get(ChemEquiAnalysis *ptr, cbool *val)
+cdef extern void chemequianalysis_use_prev_guess_set(ChemEquiAnalysis *ptr, cbool *val)
+
 cdef extern void chemequianalysis_mass_tol_get(ChemEquiAnalysis *ptr, double *val)
 cdef extern void chemequianalysis_mass_tol_set(ChemEquiAnalysis *ptr, double *val)

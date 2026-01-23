@@ -44,6 +44,7 @@ module equilibrate
     real(dp) :: mass_tol = 1.0e-6_dp !! Degree to which mass will be balanced. 
                                      !! Gordon & McBride's default is 1.0e-6, but
                                      !! it seems like 1.0e-2 is OK.
+    logical :: use_prev_guess = .false. !! Use previous converged solution as initial guess.
 
     !> Driver class
     type(CEAData), allocatable :: dat
@@ -259,7 +260,8 @@ contains
                            molfracs_reactants=self%molfracs_species, &
                            massfracs_reactants=self%massfracs_species, &
                            temp=T, press=P_bars, &
-                           nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%mubar, rho=self%rho, c_pe=self%c_pe)
+                           nabla_ad=self%nabla_ad, gamma2=self%gamma2, MMW=self%mubar, rho=self%rho, c_pe=self%c_pe, &
+                           use_prev_guess=self%use_prev_guess)
     if (self%dat%error) then
       err = trim(self%dat%err_msg)
       return

@@ -53,6 +53,9 @@ module equilibrate_cea
       real(dp)                :: b_0_norm_cache = 0d0
       logical                 :: b_0_cache_valid = .false.
       integer                 :: b_0_cache_atoms_use = 0
+      logical                 :: prev_guess_valid = .false.
+      real(dp), allocatable   :: prev_n_spec(:)  !(N_reac)
+      real(dp)                :: prev_n = 0d0
    
    contains
       procedure :: set_data
@@ -232,8 +235,13 @@ contains
          if (allocated(self%b_0_cache)) then
             deallocate(self%b_0_cache)
          end if
+         if (allocated(self%prev_n_spec)) then
+            deallocate(self%prev_n_spec)
+         end if
          self%b_0_cache_valid = .false.
          self%b_0_cache_atoms_use = 0
+         self%prev_guess_valid = .false.
+         self%prev_n = 0d0
       end if
       if (.not. allocated(self%names_reactants_orig)) then
          ! Allocate reactant-related arrays
@@ -257,6 +265,7 @@ contains
          allocate(self%H_0_298_15_K_m_H_0_0_K(N_temps,self%N_reactants))
          allocate(self%mol_weight(self%N_reactants))
          allocate(self%b_0_cache(self%N_atoms))
+         allocate(self%prev_n_spec(self%N_reactants))
       end if
 
       ! Set self%names_reactants_orig with the given list of reactants
@@ -303,6 +312,12 @@ contains
       end if
       self%b_0_cache_valid = .false.
       self%b_0_cache_atoms_use = 0
+      if (allocated(self%prev_n_spec)) then
+         deallocate(self%prev_n_spec)
+      end if
+      allocate(self%prev_n_spec(self%N_reactants))
+      self%prev_guess_valid = .false.
+      self%prev_n = 0d0
 
       ! call da_CH2STR(atoms_char, self%names_atoms(1:N_atoms_in))
       self%names_atoms(1:N_atoms_in) = atoms_names_
@@ -324,6 +339,8 @@ contains
 
       call da_BUILD_A_STOICH(self)
       if (self%error) RETURN
+
+      self%prev_guess_valid = .false.
 
    end subroutine SET_DATA
 
@@ -743,7 +760,7 @@ contains
 
    !> MAIN SUBROUTINE
    subroutine solve(self,mode,verbo,verbose2,N_atoms_in,N_reactants_in,molfracs_atoms,mass_tol, &
-      molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe)
+      molfracs_reactants,massfracs_reactants,temp,press,nabla_ad,gamma2,MMW,rho,c_pe, use_prev_guess)
 
       !! I/O:
       class(CEAData), intent(inout) :: self
@@ -756,6 +773,7 @@ contains
       integer, intent(in)              :: N_atoms_in, N_reactants_in
       real(dp), intent(in)     :: temp, press
       real(dp), intent(out)    :: nabla_ad,gamma2,MMW,rho,c_pe
+      logical, intent(in) :: use_prev_guess
 
       !! Internal:
       real(dp)                 :: C_P_0(self%N_reactants), H_0(self%N_reactants), S_0(self%N_reactants)
@@ -805,11 +823,26 @@ contains
       call ec_COMP_THERMO_QUANTS(self,temp,self%N_reactants,C_P_0, H_0, S_0)
       gamma2 = 0d0
       temp_use = temp
-      call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
-      molfracs_reactants, massfracs_reactants, &
-      temp_use, press, C_P_0, H_0, S_0, &
-      nabla_ad, gamma2, MMW, rho, c_pe)
-      if (self%error) RETURN
+      if (use_prev_guess .and. self%prev_guess_valid) then
+         call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
+         molfracs_reactants, massfracs_reactants, &
+         temp_use, press, C_P_0, H_0, S_0, &
+         nabla_ad, gamma2, MMW, rho, c_pe, use_prev_guess=.true.)
+         if (self%error) RETURN
+         if (.not. self%converged) then
+            call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
+            molfracs_reactants, massfracs_reactants, &
+            temp_use, press, C_P_0, H_0, S_0, &
+            nabla_ad, gamma2, MMW, rho, c_pe, use_prev_guess=.false.)
+            if (self%error) RETURN
+         end if
+      else
+         call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants,  molfracs_atoms_ions(1:N_atoms_use), &
+         molfracs_reactants, massfracs_reactants, &
+         temp_use, press, C_P_0, H_0, S_0, &
+         nabla_ad, gamma2, MMW, rho, c_pe, use_prev_guess=.false.)
+         if (self%error) RETURN
+      end if
 
       c_pe = c_pe*1d7 ! J/(g K) to erg/(g K)
 
@@ -999,7 +1032,7 @@ contains
    !> Computes the specie abundances (molar and mass)
    recursive subroutine ec_COMP_EQU_CHEM(self, N_atoms_use, N_reac, molfracs_atoms, &
       molfracs_reactants, massfracs_reactants, &
-      temp, press, C_P_0, H_0, S_0, nabla_ad, gamma2, MMW, rho, c_pe)
+      temp, press, C_P_0, H_0, S_0, nabla_ad, gamma2, MMW, rho, c_pe, use_prev_guess)
       use equilibrate_const, only: amu, kB, masses_atoms_save
 
       !! I/O:
@@ -1010,6 +1043,7 @@ contains
       real(dp), intent(in)     :: temp, press
       real(dp), intent(in)     :: C_P_0(N_reac), H_0(N_reac), S_0(N_reac)
       real(dp), intent(out)    :: nabla_ad, gamma2, MMW, rho, c_pe
+      logical, intent(in) :: use_prev_guess
 
       !! CEA McBride 1994 style variables:
       real(dp)  :: n ! Moles of gas particles per total mass of mixture in kg
@@ -1030,7 +1064,7 @@ contains
 
       converged = .FALSE.
       slowed = .FALSE.
-      call ec_INIT_ALL_VALS(self,N_atoms_use,self%N_reactants,n,n_spec,pi_atom)
+      call ec_INIT_ALL_VALS(self,N_atoms_use,self%N_reactants,n,n_spec,pi_atom,use_prev_guess)
 
       self%iter_max = 50 + self%N_reactants/2
       current_solids_number = 0
@@ -1216,7 +1250,7 @@ contains
                      call ec_COMP_EQU_CHEM(self,N_atoms_use, self%N_reactants, molfracs_atoms, &
                      molfracs_reactants, massfracs_reactants, &
                      temp, press, C_P_0, H_0, S_0, &
-                     nabla_ad,gamma2,MMW,rho,c_pe)
+                     nabla_ad,gamma2,MMW,rho,c_pe, use_prev_guess)
                      if (self%error) return
                      self%quick = .TRUE.
                      slowed = .TRUE.
@@ -1296,10 +1330,19 @@ contains
 
       END IF
 
+      if (self%converged) then
+         if (.not. allocated(self%prev_n_spec)) then
+            allocate(self%prev_n_spec(self%N_reactants))
+         end if
+         self%prev_n_spec = n_spec
+         self%prev_n = n
+         self%prev_guess_valid = .true.
+      end if
+
    end subroutine ec_COMP_EQU_CHEM
 
    !> Initialize all abundances with uniform abundances for gas and 0 for condensates
-   subroutine ec_INIT_ALL_VALS(self,N_atoms_use,N_reac,n,n_spec,pi_atom)
+   subroutine ec_INIT_ALL_VALS(self,N_atoms_use,N_reac,n,n_spec,pi_atom,use_prev_guess)
       !! I/O:
       class(CEAData), intent(inout) :: self
       integer, intent(in)           :: N_atoms_use, N_reac
@@ -1307,21 +1350,39 @@ contains
       real(dp), intent(out) :: n_spec(N_reac) ! Moles of species per total mass of mixture in kg
       real(dp), intent(out) :: pi_atom(N_atoms_use) ! Lagrangian multipliers for the atomic species divided
       ! by (R*T)
+      logical, intent(in) :: use_prev_guess
 
       !! Internal:
       INTEGER                      :: i_reac
 
-      n = 0.1d0
-      n_spec = 0d0
-      pi_atom = 0d0
-      DO i_reac = 1, self%N_gas
-         n_spec(i_reac) = n/DBLE(self%N_gas)
-         IF (self%remove_ions) THEN
-            IF(self%reac_ion(i_reac)) THEN
-               n_spec(i_reac) = 0d0
+      if (use_prev_guess .and. self%prev_guess_valid .and. &
+          allocated(self%prev_n_spec) .and. size(self%prev_n_spec) == N_reac) then
+         n_spec = self%prev_n_spec
+         n = self%prev_n
+         if (self%remove_ions) then
+            DO i_reac = 1, self%N_gas
+               if (self%reac_ion(i_reac)) then
+                  n_spec(i_reac) = 0d0
+               end if
+            END DO
+            n = max(sum(n_spec(1:self%N_gas)), tiny(1.0_dp))
+         else
+            n = max(n, sum(n_spec(1:self%N_gas)), tiny(1.0_dp))
+         end if
+      else
+         n = 0.1d0
+         n_spec = 0d0
+         pi_atom = 0d0
+         DO i_reac = 1, self%N_gas
+            n_spec(i_reac) = n/DBLE(self%N_gas)
+            IF (self%remove_ions) THEN
+               IF(self%reac_ion(i_reac)) THEN
+                  n_spec(i_reac) = 0d0
+               END IF
             END IF
-         END IF
-      END DO
+         END DO
+      end if
+      pi_atom = 0d0
 
    end subroutine ec_INIT_ALL_VALS
 

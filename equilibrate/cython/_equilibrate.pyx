@@ -310,6 +310,15 @@ cdef class ChemEquiAnalysis:
     def __set__(self, cbool val):
       cea_pxd.chemequianalysis_verbose_set(self._ptr, &val)
 
+  property use_prev_guess:
+    "bool. Use previous converged solution as initial guess."
+    def __get__(self):
+      cdef cbool val
+      cea_pxd.chemequianalysis_use_prev_guess_get(self._ptr, &val)
+      return val
+    def __set__(self, cbool val):
+      cea_pxd.chemequianalysis_use_prev_guess_set(self._ptr, &val)
+
   property mass_tol:
     """float. Degree to which mass will be balanced. Gordon & McBride's default 
     is 1.0e-6, but it seems like 1.0e-2 is OK.

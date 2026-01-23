@@ -468,6 +468,24 @@ contains
     cea%verbose = val
   end subroutine
 
+  subroutine chemequianalysis_use_prev_guess_get(ptr, val) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    logical(c_bool), intent(out) :: val
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    val = cea%use_prev_guess
+  end subroutine
+  
+  subroutine chemequianalysis_use_prev_guess_set(ptr, val) bind(c)
+    use equilibrate, only: ChemEquiAnalysis
+    type(c_ptr), value, intent(in) :: ptr
+    logical(c_bool), intent(in) :: val
+    type(ChemEquiAnalysis), pointer :: cea
+    call c_f_pointer(ptr, cea)
+    cea%use_prev_guess = val
+  end subroutine
+
   subroutine chemequianalysis_mass_tol_get(ptr, val) bind(c)
     use equilibrate, only: ChemEquiAnalysis
     type(c_ptr), value, intent(in) :: ptr
