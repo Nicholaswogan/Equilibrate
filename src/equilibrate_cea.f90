@@ -48,6 +48,11 @@ module equilibrate_cea
       real(dp), allocatable   :: form_heat_Jmol_298_15_K(:)  !(N_reac)
       real(dp), allocatable   :: H_0_298_15_K_m_H_0_0_K(:,:)  !(N_temps, N_reac)
       real(dp), allocatable   :: mol_weight(:)  !(N_reac)
+      real(dp), allocatable   :: a_stoich(:,:)  !(N_reac,N_atoms)
+      real(dp), allocatable   :: b_0_cache(:)  !(N_atoms)
+      real(dp)                :: b_0_norm_cache = 0d0
+      logical                 :: b_0_cache_valid = .false.
+      integer                 :: b_0_cache_atoms_use = 0
    
    contains
       procedure :: set_data
@@ -221,6 +226,14 @@ contains
          deallocate(self%form_heat_Jmol_298_15_K)
          deallocate(self%H_0_298_15_K_m_H_0_0_K)
          deallocate(self%mol_weight)
+         if (allocated(self%a_stoich)) then
+            deallocate(self%a_stoich)
+         end if
+         if (allocated(self%b_0_cache)) then
+            deallocate(self%b_0_cache)
+         end if
+         self%b_0_cache_valid = .false.
+         self%b_0_cache_atoms_use = 0
       end if
       if (.not. allocated(self%names_reactants_orig)) then
          ! Allocate reactant-related arrays
@@ -243,6 +256,7 @@ contains
          allocate(self%form_heat_Jmol_298_15_K(self%N_reactants))
          allocate(self%H_0_298_15_K_m_H_0_0_K(N_temps,self%N_reactants))
          allocate(self%mol_weight(self%N_reactants))
+         allocate(self%b_0_cache(self%N_atoms))
       end if
 
       ! Set self%names_reactants_orig with the given list of reactants
@@ -279,6 +293,16 @@ contains
          allocate(self%names_atoms(self%N_atoms))
          allocate(self%id_atoms(self%N_atoms))
       end if
+      if (allocated(self%b_0_cache)) then
+         if (size(self%b_0_cache) /= self%N_atoms) then
+            deallocate(self%b_0_cache)
+         end if
+      end if
+      if (.not. allocated(self%b_0_cache)) then
+         allocate(self%b_0_cache(self%N_atoms))
+      end if
+      self%b_0_cache_valid = .false.
+      self%b_0_cache_atoms_use = 0
 
       ! call da_CH2STR(atoms_char, self%names_atoms(1:N_atoms_in))
       self%names_atoms(1:N_atoms_in) = atoms_names_
@@ -296,6 +320,10 @@ contains
       if (self%error) RETURN
 
       call da_REAC_ATOMS_ID(self)
+      if (self%error) RETURN
+
+      call da_BUILD_A_STOICH(self)
+      if (self%error) RETURN
 
    end subroutine SET_DATA
 
@@ -509,6 +537,39 @@ contains
          end do
       end do
    end subroutine da_REAC_ATOMS_ID
+
+   subroutine da_BUILD_A_STOICH(self)
+      use equilibrate_const, only: mol
+      class(CEAData), intent(inout) :: self
+      integer :: i_reac, i_ratom, i_atom, atom_id
+
+      if (allocated(self%a_stoich)) then
+         if (size(self%a_stoich,1) /= self%N_reactants .or. &
+             size(self%a_stoich,2) /= self%N_atoms) then
+            deallocate(self%a_stoich)
+         end if
+      end if
+      if (.not. allocated(self%a_stoich)) then
+         allocate(self%a_stoich(self%N_reactants,self%N_atoms))
+      end if
+      self%a_stoich = 0d0
+
+      do i_reac = 1, self%N_reactants
+         do i_ratom = 1, 5
+            atom_id = self%reac_atoms_id(i_ratom,i_reac)
+            if (atom_id > 0) then
+               i_atom = findloc(self%id_atoms, atom_id, 1)
+               if (i_atom == 0) then
+                  self%error = .true.
+                  self%err_msg = 'Stoichiometry mapping failed for reactant '// &
+                                 trim(self%names_reactants(i_reac))
+                  return
+               end if
+               self%a_stoich(i_reac,i_atom) = self%reac_stoich(i_ratom,i_reac)*mol
+            end if
+         end do
+      end do
+   end subroutine da_BUILD_A_STOICH
 
    !> Read in provided file all thermodynamic data
    subroutine da_READ_THERMO(self, fpath)
@@ -733,6 +794,11 @@ contains
       else
          N_atoms_use = N_atoms_in
       end if
+
+      call ec_b_0(self,N_atoms_use, molfracs_atoms_ions(1:N_atoms_use), self%b_0_norm_cache, &
+                 self%b_0_cache(1:N_atoms_use))
+      self%b_0_cache_valid = .true.
+      self%b_0_cache_atoms_use = N_atoms_use
 
       ! CALCULATION BEGINS
 
@@ -1381,7 +1447,7 @@ contains
    !> Build the small matrix
    subroutine ec_PREP_MATRIX_SHORT(self,N_atoms_use, N_reac, molfracs_atoms, N_species, press, temp, &
    H_0, S_0, n, n_spec, matrix, vector, solid_indices, N_solids, mu_gas, a_gas)
-      use equilibrate_const, only: mol, R
+      use equilibrate_const, only: R
       !! I/O:
       class(CEAData), intent(inout) :: self
       INTEGER, intent(in)          :: N_atoms_use, N_reac, N_species, N_solids
@@ -1399,8 +1465,9 @@ contains
 
       !! Internal:
       real(dp)             :: b_0(N_atoms_use), b_0_norm, b(N_atoms_use)
-      real(dp)             :: a(N_species,N_atoms_use), mu(N_species)
-      INTEGER                      :: i_atom, i_reac, i_ratom, i_atom2
+      real(dp)             :: mu_solids(max(1,N_solids))
+      real(dp)             :: inv_RT, logp, sum_n_gas, sum_n_mu, a_ia
+      INTEGER                      :: i_atom, i_reac, i_atom2, i_solid, solid_idx
 
       !f2py integer, intent(aux) :: self%N_gas
 
@@ -1414,139 +1481,90 @@ contains
       !    b_0_norm = b_0_norm + mass_atom*molfracs_atoms(i_atom)
       ! END DO
       ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
-
-      ! Set up a_ij
-      a = 0d0
-      DO i_atom = 1, N_atoms_use
-         ! call uppercase(self%names_atoms(i_atom),upper_atom_name)
-         DO i_reac = 1, self%N_gas
-            IF (self%remove_ions) THEN
-               IF (self%reac_ion(i_reac)) THEN
-                  a(i_reac,1:N_atoms_use) = 0d0
-                  CYCLE
-               END IF
-            END IF
-            DO i_ratom = 1, 5
-               IF (self%reac_atoms_id(i_ratom, i_reac)>0 .and. &
-               self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, i_reac)) then
-                  a(i_reac,i_atom) = self%reac_stoich(i_ratom,i_reac)*mol
-               END IF
-            END DO
-         END DO
-         DO i_reac = self%N_gas+1, N_species
-            DO i_ratom = 1, 5
-               IF (self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))>0 .and. &
-               self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))) then
-                  a(i_reac,i_atom) = self%reac_stoich(i_ratom,solid_indices(i_reac-self%N_gas))*mol
-                  ! print *, i_ratom, i_reac, i_atom
-               END IF
-            END DO
-         END DO
-      END DO
+      if (self%b_0_cache_valid .and. self%b_0_cache_atoms_use == N_atoms_use) then
+         b_0 = self%b_0_cache(1:N_atoms_use)
+         b_0_norm = self%b_0_norm_cache
+      else
+         call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      end if
 
       ! Set up mu_j
-      DO i_reac = 1, N_species
-         IF (self%remove_ions) THEN
-            IF (self%reac_ion(i_reac)) THEN
-               mu(i_reac) = 0d0
-               CYCLE
-            END IF
-         END IF
-         ! Taken from Venot et al. (2012), in comparison with McBride 1996.
-         IF (i_reac <= self%N_gas) THEN
-            mu(i_reac) = H_0(i_reac) - temp*S_0(i_reac)
-
-            IF (n_spec(i_reac) > 1d-290) THEN
-               mu(i_reac) = mu(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*log(press)
-            ELSE
-               IF (self%verbose) THEN
-                  write(*,*) 'n_spec(i_reac) == 0 for '//trim(adjustl(self%names_reactants(i_reac)))// &
-                  ' set to 1d-13 and try again.'
-               END IF
-               call RANDOM_NUMBER(n_spec(i_reac))
-               n_spec(i_reac) = n_spec(i_reac)*1d-13
-               mu(i_reac) = mu(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*log(press)
-            END IF
-         ELSE
-            mu(i_reac) = H_0(solid_indices(i_reac-self%N_gas)) - temp*S_0(solid_indices(i_reac-self%N_gas))
-         END IF
-      END DO
-
-      a_gas = a(1:self%N_gas,1:N_atoms_use)
-      mu_gas = mu(1:self%N_gas)
-
-      ! MATRIX SETUP
-      matrix = 0d0
-
-      ! Set up the matrix for the N_atoms equations (Eq. 2.24)
-      DO i_atom = 1, N_atoms_use
-         DO i_atom2 = 1, N_atoms_use
-            DO i_reac = 1, self%N_gas
-               ! IF (self%remove_ions) THEN
-               !    IF (self%reac_ion(i_reac)) THEN
-               !       CYCLE
-               !    END IF
-               ! END IF
-               if (.not. self%remove_ions .or. .not. self%reac_ion(i_reac)) then
-                  matrix(i_atom,i_atom2) = matrix(i_atom,i_atom2) + &
-                  a(i_reac,i_atom)*a(i_reac,i_atom2)*n_spec(i_reac)
-               end if
-            END DO
-         END DO
-
-         DO i_reac = 1, self%N_gas
-            ! IF (self%remove_ions) THEN
-            !    IF (self%reac_ion(i_reac)) THEN
-            !       CYCLE
-            !    END IF
-            ! END IF
-            if (.not. self%remove_ions .or. .not. self%reac_ion(i_reac)) then
-               matrix(i_atom,N_atoms_use+1) = matrix(i_atom,N_atoms_use+1) + &
-               a(i_reac,i_atom)*n_spec(i_reac)
-            end if
-         END DO
-
-         IF (self%N_gas < N_species) THEN
-            DO i_reac = self%N_gas+1, N_species
-               matrix(i_atom,N_atoms_use+1+i_reac-self%N_gas) = a(i_reac,i_atom)
-            END DO
-         END IF
-
-      END DO
-
-      ! Set up the matrix for the equation (Eq. 2.26)
-      DO i_atom = 1, N_atoms_use
-         DO i_reac = 1, self%N_gas
-            IF (self%remove_ions) THEN
-               IF (self%reac_ion(i_reac)) THEN
-                  CYCLE
-               END IF
-            END IF
-            matrix(N_atoms_use+1,i_atom) = matrix(N_atoms_use+1,i_atom) + &
-            a(i_reac,i_atom)*n_spec(i_reac)
-         END DO
-      END DO
-
+      inv_RT = 1d0/(R*temp)
+      logp = log(press)
+      mu_gas = 0d0
+      if (N_solids > 0) then
+         mu_solids = 0d0
+      end if
       DO i_reac = 1, self%N_gas
          IF (self%remove_ions) THEN
             IF (self%reac_ion(i_reac)) THEN
                CYCLE
             END IF
          END IF
-         matrix(N_atoms_use+1,N_atoms_use+1) = matrix(N_atoms_use+1,N_atoms_use+1) + n_spec(i_reac) !!
-      END DO
-      matrix(N_atoms_use+1,N_atoms_use+1) = matrix(N_atoms_use+1,N_atoms_use+1) - n
+         ! Taken from Venot et al. (2012), in comparison with McBride 1996.
+         mu_gas(i_reac) = H_0(i_reac) - temp*S_0(i_reac)
 
-      ! Set up the matrix for the (self%N_reactants-self%N_gas) equations (Eq. 2.25)
+         IF (n_spec(i_reac) > 1d-290) THEN
+            mu_gas(i_reac) = mu_gas(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*logp
+         ELSE
+            IF (self%verbose) THEN
+               write(*,*) 'n_spec(i_reac) == 0 for '//trim(adjustl(self%names_reactants(i_reac)))// &
+               ' set to 1d-13 and try again.'
+            END IF
+            call RANDOM_NUMBER(n_spec(i_reac))
+            n_spec(i_reac) = n_spec(i_reac)*1d-13
+            mu_gas(i_reac) = mu_gas(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*logp
+         END IF
+      END DO
+      if (N_solids > 0) then
+         DO i_solid = 1, N_solids
+            solid_idx = solid_indices(i_solid)
+            mu_solids(i_solid) = H_0(solid_idx) - temp*S_0(solid_idx)
+         END DO
+      end if
+
+      a_gas = self%a_stoich(1:self%N_gas,1:N_atoms_use)
+
+      ! MATRIX SETUP
+      matrix = 0d0
+      b = 0d0
+      sum_n_gas = 0d0
+      sum_n_mu = 0d0
+
+      ! Set up the matrix for the N_atoms equations (Eq. 2.24)
+      DO i_reac = 1, self%N_gas
+         IF (self%remove_ions) THEN
+            IF (self%reac_ion(i_reac)) THEN
+               CYCLE
+            END IF
+         END IF
+         sum_n_gas = sum_n_gas + n_spec(i_reac)
+         sum_n_mu = sum_n_mu + n_spec(i_reac)*mu_gas(i_reac)*inv_RT
+         DO i_atom = 1, N_atoms_use
+            a_ia = self%a_stoich(i_reac,i_atom)
+            b(i_atom) = b(i_atom) + a_ia*n_spec(i_reac)
+            matrix(i_atom,N_atoms_use+1) = matrix(i_atom,N_atoms_use+1) + a_ia*n_spec(i_reac)
+            DO i_atom2 = 1, N_atoms_use
+               matrix(i_atom,i_atom2) = matrix(i_atom,i_atom2) + a_ia*self%a_stoich(i_reac,i_atom2)*n_spec(i_reac)
+            END DO
+         END DO
+      END DO
+      matrix(N_atoms_use+1,1:N_atoms_use) = matrix(1:N_atoms_use,N_atoms_use+1)
+      matrix(N_atoms_use+1,N_atoms_use+1) = sum_n_gas - n
 
       IF (self%N_gas < N_species) THEN
-         DO i_reac = self%N_gas+1, N_species
+         DO i_solid = 1, N_species-self%N_gas
+            solid_idx = solid_indices(i_solid)
             DO i_atom = 1, N_atoms_use
-               matrix(N_atoms_use+1+i_reac-self%N_gas,i_atom) = a(i_reac,i_atom)
+               a_ia = self%a_stoich(solid_idx,i_atom)
+               b(i_atom) = b(i_atom) + a_ia*n_spec(solid_idx)
+               matrix(i_atom,N_atoms_use+1+i_solid) = a_ia
+               matrix(N_atoms_use+1+i_solid,i_atom) = a_ia
             END DO
          END DO
       END IF
+
+      ! Set up the matrix for the (self%N_reactants-self%N_gas) equations (Eq. 2.25)
 
       ! VECTOR SETUP
       !vector(N_atoms+1+(self%N_reactants-self%N_gas))
@@ -1554,24 +1572,10 @@ contains
 
       ! (Eq. 2.25)
       IF (self%N_gas < N_species) THEN
-         vector(N_atoms_use+2:N_atoms_use+1+(N_species-self%N_gas)) = mu(self%N_gas+1:N_species)/R/temp
+         vector(N_atoms_use+2:N_atoms_use+1+(N_species-self%N_gas)) = mu_solids(1:N_species-self%N_gas)*inv_RT
       END IF
 
       ! (Eq. 2.24)
-      b = 0d0
-      DO i_atom = 1, N_atoms_use
-         DO i_reac = 1, self%N_gas
-            IF (self%remove_ions) THEN
-               IF (self%reac_ion(i_reac)) THEN
-                  CYCLE
-               END IF
-            END IF
-            b(i_atom) = b(i_atom) + a(i_reac,i_atom)*n_spec(i_reac)
-         END DO
-         DO i_reac = self%N_gas+1, N_species
-            b(i_atom) = b(i_atom) + a(i_reac,i_atom)*n_spec(solid_indices(i_reac-self%N_gas))
-         END DO
-      END DO
       vector(1:N_atoms_use) = b_0 - b
       DO i_reac = 1, self%N_gas
          IF (self%remove_ions) THEN
@@ -1580,11 +1584,11 @@ contains
             END IF
          END IF
          vector(1:N_atoms_use) = vector(1:N_atoms_use) + &
-         a(i_reac,1:N_atoms_use)*n_spec(i_reac)*mu(i_reac)/R/temp
+         self%a_stoich(i_reac,1:N_atoms_use)*n_spec(i_reac)*mu_gas(i_reac)*inv_RT
       END DO
 
       ! (Eq. 2.26)
-      vector(N_atoms_use+1) = n - SUM(n_spec(1:self%N_gas)) + SUM(n_spec(1:self%N_gas)*mu(1:self%N_gas))/R/temp
+      vector(N_atoms_use+1) = n - sum_n_gas + sum_n_mu
 
    end subroutine ec_PREP_MATRIX_SHORT
 
@@ -1621,8 +1625,8 @@ contains
 
       ! MASS BALANCE CHECKS
       real(dp)             :: b_0(N_atoms_use), b_0_norm, pi_atom_old(N_atoms_use)
-      real(dp)             :: a(N_species,N_atoms_use), mval_mass_good
-      INTEGER                      :: i_atom, i_ratom
+      real(dp)             :: mval_mass_good
+      INTEGER                      :: i_atom
       LOGICAL                      :: mass_good, pi_good
       real(dp)             :: molfracs_atoms(N_atoms_use)
       real(dp)             :: change
@@ -1714,50 +1718,24 @@ contains
       mass_good = .TRUE.
       pi_good = .TRUE.
 
-      ! Set up b0
-      ! b_0_norm = 0d0
-      ! DO i_atom = 1, N_atoms_use
-      !    ! call ec_ATOM_MASS(self%names_atoms(i_atom),mass_atom)
-      !    mass_atom = masses_atoms_save(self%id_atoms(i_atom))
-      !    b_0_norm = b_0_norm + mass_atom*molfracs_atoms(i_atom)
-      ! END DO
-      ! b_0 = molfracs_atoms/b_0_norm
-      call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
-
-      ! Set up a_ij
-      a = 0d0
-      DO i_atom = 1, N_atoms_use
-         DO i_reac = 1, self%N_gas
-            IF (self%remove_ions) THEN
-               IF (self%reac_ion(i_reac)) THEN
-                  a(i_reac,1:N_atoms_use) = 0d0
-                  CYCLE
-               END IF
-            END IF
-            DO i_ratom = 1, 5
-               IF (self%reac_atoms_id(i_ratom, i_reac)>0 .and. self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, i_reac)) then
-                  a(i_reac,i_atom) = self%reac_stoich(i_ratom,i_reac)*mol
-               END IF
-            END DO
-         END DO
-         DO i_reac = self%N_gas+1, N_species
-            DO i_ratom = 1, 5
-               IF (self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))>0 .and. &
-               self%id_atoms(i_atom) == self%reac_atoms_id(i_ratom, solid_indices(i_reac - self%N_gas))) then
-                  a(i_reac,i_atom) = self%reac_stoich(i_ratom,solid_indices(i_reac-self%N_gas))*mol
-               END IF
-            END DO
-         END DO
-      END DO
+      if (self%b_0_cache_valid .and. self%b_0_cache_atoms_use == N_atoms_use) then
+         b_0 = self%b_0_cache(1:N_atoms_use)
+         b_0_norm = self%b_0_norm_cache
+      else
+         call ec_b_0(self,N_atoms_use, molfracs_atoms, b_0_norm, b_0)
+      end if
 
       mval_mass_good = MAXVAL(b_0)*self%mass_tol
       DO i_atom = 1, N_atoms_use
         mass = 0.0_dp
         do i_reac = 1,self%N_gas
-          mass = mass + a(i_reac,i_atom)*n_spec(i_reac)
+          if (.not. self%remove_ions .or. .not. self%reac_ion(i_reac)) then
+             mass = mass + self%a_stoich(i_reac,i_atom)*n_spec(i_reac)
+          end if
         enddo
         do i_reac = self%N_gas+1, N_species
-          mass = mass + a(i_reac,i_atom)*n_spec(solid_indices(i_reac-self%N_gas))
+          mass = mass + self%a_stoich(solid_indices(i_reac-self%N_gas),i_atom)* &
+                 n_spec(solid_indices(i_reac-self%N_gas))
         enddo
         IF ((abs(b_0(i_atom) - mass) > mval_mass_good) .AND. (b_0(i_atom) > 1d-6)) THEN
           mass_good = .FALSE.
