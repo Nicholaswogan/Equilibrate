@@ -779,7 +779,7 @@ contains
       self%remove_ions = .FALSE.
 
       ! call INIT_RAND_SEED()
-      call random_init(repeatable=.true., image_distinct=.true.)
+      ! call random_init(repeatable=.true., image_distinct=.true.)
 
       molfracs_atoms_ions(1:N_atoms_in) = molfracs_atoms
       molfracs_atoms_ions(self%N_atoms) = 0d0
@@ -1511,8 +1511,7 @@ contains
                write(*,*) 'n_spec(i_reac) == 0 for '//trim(adjustl(self%names_reactants(i_reac)))// &
                ' set to 1d-13 and try again.'
             END IF
-            call RANDOM_NUMBER(n_spec(i_reac))
-            n_spec(i_reac) = n_spec(i_reac)*1d-13
+            n_spec(i_reac) = 1d-13*(1d0 + 1d-6*DBLE(i_reac))
             mu_gas(i_reac) = mu_gas(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*logp
          END IF
       END DO
@@ -1916,8 +1915,7 @@ contains
                   write(*,*) 'n_spec(i_reac) == 0 for '//trim(adjustl(self%names_reactants(i_reac)))// &
                   ' set to 1d-13 and try again.'
                END IF
-               call RANDOM_NUMBER(n_spec(i_reac))
-               n_spec(i_reac) = n_spec(i_reac)*1d-13
+               n_spec(i_reac) = 1d-13*(1d0 + 1d-6*DBLE(i_reac))
                mu(i_reac) = mu(i_reac) + R*temp*log(n_spec(i_reac)/n)+R*temp*log(press)
             END IF
 
