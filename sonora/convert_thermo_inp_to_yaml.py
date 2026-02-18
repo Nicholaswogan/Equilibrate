@@ -8,7 +8,7 @@ import math
 import pathlib
 import re
 from collections import OrderedDict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple
 from photochem.utils._format import FormatReactions_main, yaml, MyDumper
 
 FLOAT_RE = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[DE][+-]?\d+)?")
@@ -235,6 +235,7 @@ def to_dict(atoms: List[Tuple[str, float]], species: List[Dict], output: pathlib
 def convert_file(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
+    species: Sequence[str] | None = None,
     normalize_species_case: bool = False,
     dedupe_names: bool = False,
 ) -> None:
@@ -283,6 +284,9 @@ def convert_file(
 
     original_names = collect_original_names(raw_lines)
 
+    requested_species = set(species) if species is not None else None
+    matched_species: set[str] = set()
+
     idx = 0
     n_lines = len(raw_lines)
     existing_names = set()
@@ -303,11 +307,16 @@ def convert_file(
             sp["name"] = maybe_normalize_species_name(
                 sp["name"], sp["composition"], existing_names, original_names
             )
+        if requested_species is not None and sp["name"] not in requested_species:
+            continue
+
         if dedupe_names and sp["name"] in existing_names:
             pass  # skip duplicate name
         else:
             species_list.append(sp)
             existing_names.add(sp["name"])
+            if requested_species is not None:
+                matched_species.add(sp["name"])
 
         # Record atomic masses for elemental species (single atom with count 1)
         if len(sp["composition"]) == 1:
@@ -317,6 +326,14 @@ def convert_file(
         # Track atom usage order
         for atom in sp["composition"].keys():
             atoms_seen.setdefault(atom, None)
+
+    if requested_species is not None:
+        missing_species = [name for name in species if name not in matched_species]
+        if missing_species:
+            raise ValueError(
+                "Requested species were not found in input file: "
+                + ", ".join(missing_species)
+            )
 
     if "E" not in atom_masses:
         atom_masses["E"] = ELECTRON_MASS
@@ -358,6 +375,11 @@ def main() -> None:
         action="store_true",
         help="Skip duplicate species entries with the same (possibly normalized) name",
     )
+    parser.add_argument(
+        "--species",
+        nargs="+",
+        help="Optional list of species names to include; errors if any are missing",
+    )
     args = parser.parse_args()
 
     input_path = args.input
@@ -366,6 +388,7 @@ def main() -> None:
     convert_file(
         input_path,
         output_path,
+        species=args.species,
         normalize_species_case=args.normalize_species_case,
         dedupe_names=args.dedupe_names,
     )
