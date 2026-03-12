@@ -460,6 +460,10 @@ contains
           print*, err
           stop 1
         endif
+        if (.not.converged) then
+          print*, 'test_sonora did not converge at P, T = ', P, T
+          stop 1
+        endif
 
         if (size(cea%molfracs_species) /= size(species)) then
           print*, 'Sonora test returned the wrong number of species.'
