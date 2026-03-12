@@ -1136,6 +1136,7 @@ contains
       ! THEN: INCLUDE CONDENSATES!
       IF (self%N_cond > 0) THEN
          solid_inclu = .FALSE.
+         solid_indices = 0
          inc_next = 0
          neg_cond = .FALSE.
 
@@ -1149,15 +1150,15 @@ contains
             if (inc_next/=-1) then
 
                IF (remove_cond) THEN
-                  current_solids_number = current_solids_number - 1
                   solid_indices_buff = 0
                   buffer_ind = 1
-                  DO i_reac = 1, self%N_reactants-self%N_gas
+                  do i_reac = 1, current_solids_number
                      IF (solid_indices(i_reac) .NE. inc_next) THEN
                         solid_indices_buff(buffer_ind) = solid_indices(i_reac)
                         buffer_ind = buffer_ind + 1
                      END IF
                   END DO
+                  current_solids_number = buffer_ind - 1
                   solid_indices = solid_indices_buff
                   solid_inclu(inc_next-self%N_gas) = .FALSE.
                   neg_cond(inc_next-self%N_gas) = .TRUE.

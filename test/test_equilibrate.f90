@@ -3,6 +3,7 @@ program main
   implicit none
 
   call test()
+  call test_sonora()
   call test_memory()
   call test_nasa7()
 
@@ -327,6 +328,163 @@ contains
 
     print*,'test passed.'
 
+  end subroutine
+
+  subroutine test_sonora()
+    type(ChemEquiAnalysis) :: cea
+    character(:), allocatable :: err
+    character(s_str_len), allocatable :: species(:)
+    real(dp), allocatable :: molfracs_atoms_sun(:)
+    logical :: converged
+    integer, parameter :: nT = 10, nP = 10
+    integer :: i, iP, iT
+    real(dp) :: P, T
+
+    species = [ &
+      'e-                  ', 'H2                  ', 'H                   ', 'H+                  ', &
+      'H-                  ', 'H2-                 ', 'H2+                 ', 'H3+                 ', &
+      'He                  ', 'H2O                 ', 'CH4                 ', 'CO                  ', &
+      'NH3                 ', 'N2                  ', 'PH3                 ', 'H2S                 ', &
+      'TiO                 ', 'VO                  ', 'Fe                  ', 'FeH                 ', &
+      'CrH                 ', 'Na                  ', 'K                   ', 'Rb                  ', &
+      'atCs                ', 'CO2                 ', 'HCN                 ', 'C2H2                ', &
+      'C2H4                ', 'C2H6                ', 'COS                 ', 'SiO                 ', &
+      'MgH                 ', 'Li                  ', 'LiOH                ', 'LiH                 ', &
+      'LiCl                ', 'Li+                 ', 'LiF                 ', 'OH                  ', &
+      'C-gr                ', 'Mg                  ', 'Mg+                 ', 'Si                  ', &
+      'Fe+                 ', 'Ti                  ', 'Ti+                 ', 'C                   ', &
+      'O                   ', 'C+                  ', 'O+                  ', 'He+                 ', &
+      'C2                  ', 'CH                  ', 'CN                  ', 'CS                  ', &
+      'C2H                 ', 'CH2                 ', 'CH3                 ', 'C3H8                ', &
+      'HCHO                ', 'CH2OH               ', 'CH3OH               ', 'CH3O                ', &
+      'N                   ', 'NH                  ', 'NH2                 ', 'NO                  ', &
+      'N2H2                ', 'N2H4                ', 'O2                  ', 'H2O2                ', &
+      'P                   ', 'PH2                 ', 'P2                  ', 'PO                  ', &
+      'PH                  ', 'P4O6(Gurvich)       ', 'S                   ', 'SH                  ', &
+      'SN                  ', 'SO                  ', 'S2                  ', 'SO2                 ', &
+      'S-                  ', 'SH-                 ', 'Cr                  ', 'Cr+                 ', &
+      'CrO                 ', 'CrO2                ', 'FeO                 ', 'FeOH                ', &
+      'FeS                 ', 'Fe(OH)2             ', 'FeCl                ', 'MgO                 ', &
+      'MgOH                ', 'MgS                 ', 'Mg(OH)2             ', 'Si+                 ', &
+      'SiS                 ', 'SiH                 ', 'SiO2                ', 'SiH2                ', &
+      'SiH3                ', 'SiH4                ', 'Na+                 ', 'NaCl                ', &
+      'NaOH                ', 'NaH                 ', 'K+                  ', 'KCl                 ', &
+      'KH                  ', 'KOH                 ', 'V                   ', 'V+                  ', &
+      'VO2                 ', 'TiO2                ', 'Cl-                 ', 'Cl                  ', &
+      'HCl                 ', 'RbCl                ', 'Rb+                 ', 'RbH                 ', &
+      'RbO                 ', 'RbOH                ', 'RbF                 ', 'CsCl                ', &
+      'Cs+                 ', 'CsH                 ', 'F                   ', 'F-                  ', &
+      'HF                  ', 'NaF                 ', 'NH4H2PO4(c)         ', 'VO(c)               ', &
+      'VO(L)               ', 'TiO2(c)             ', 'TiO2(L)             ', 'MgO(c)              ', &
+      'MgO(L)              ', 'SiO2(c)             ', 'SiO2(L)             ', 'Cr(c)               ', &
+      'Cr(L)               ', 'Fe(c)               ', 'Fe(L)               ', 'H2O(L)              ', &
+      'H2O(c)              ', 'Na2S(c)             ', 'KCl(c)              ', 'RbCl(c)             ', &
+      'CsCl(c)             ', 'Li2S(c)             ', 'LiF(cr)             ' &
+    ]
+
+    cea = ChemEquiAnalysis('../sonora/thermo-sonora-component.yaml', species=species, err=err)
+    if (allocated(err)) then
+      print*, err
+      stop 1
+    endif
+
+    cea%mass_tol = 1.0e-2_dp
+
+    allocate(molfracs_atoms_sun(size(cea%atoms_names)))
+    do i = 1,size(cea%atoms_names)
+      select case (trim(cea%atoms_names(i)))
+      case ('H')
+        molfracs_atoms_sun(i) = 9.082387e-01_dp
+      case ('He')
+        molfracs_atoms_sun(i) = 9.046346e-02_dp
+      case ('Li')
+        molfracs_atoms_sun(i) = 2.050745e-09_dp
+      case ('C')
+        molfracs_atoms_sun(i) = 3.286959e-04_dp
+      case ('N')
+        molfracs_atoms_sun(i) = 7.893027e-05_dp
+      case ('O')
+        molfracs_atoms_sun(i) = 5.982842e-04_dp
+      case ('F')
+        molfracs_atoms_sun(i) = 4.577235e-08_dp
+      case ('Na')
+        molfracs_atoms_sun(i) = 2.083182e-06_dp
+      case ('Mg')
+        molfracs_atoms_sun(i) = 3.712245e-05_dp
+      case ('Si')
+        molfracs_atoms_sun(i) = 3.604122e-05_dp
+      case ('P')
+        molfracs_atoms_sun(i) = 2.977005e-07_dp
+      case ('S')
+        molfracs_atoms_sun(i) = 1.575001e-05_dp
+      case ('Cl')
+        molfracs_atoms_sun(i) = 1.906580e-07_dp
+      case ('K')
+        molfracs_atoms_sun(i) = 1.301448e-07_dp
+      case ('Ti')
+        molfracs_atoms_sun(i) = 8.862536e-08_dp
+      case ('V')
+        molfracs_atoms_sun(i) = 9.911335e-09_dp
+      case ('Cr')
+        molfracs_atoms_sun(i) = 4.732212e-07_dp
+      case ('Fe')
+        molfracs_atoms_sun(i) = 3.142794e-05_dp
+      case ('Rb')
+        molfracs_atoms_sun(i) = 2.584155e-10_dp
+      case ('Cs')
+        molfracs_atoms_sun(i) = 1.326317e-11_dp
+      case default
+        print*, 'Unexpected Sonora atom in test_sonora: ', trim(cea%atoms_names(i))
+        stop 1
+      end select
+    enddo
+    molfracs_atoms_sun = molfracs_atoms_sun/sum(molfracs_atoms_sun)
+    cea%molfracs_atoms_sun = molfracs_atoms_sun
+
+    do iT = 1,nT
+      if (nT == 1) then
+        T = 5.0e2_dp
+      else
+        T = 5.0e2_dp + (1.0e3_dp - 5.0e2_dp)*real(iT - 1, dp)/real(nT - 1, dp)
+      endif
+      do iP = 1,nP
+        if (nP == 1) then
+          P = 1.0e9_dp
+        else
+          P = 1.0e1_dp**(9.0_dp - 9.0_dp*real(iP - 1, dp)/real(nP - 1, dp))
+        endif
+
+        converged = cea%solve_metallicity(P, T, 10.0_dp**3.5_dp, CtoO=0.5_dp, err=err)
+        if (allocated(err)) then
+          print*, 'test_sonora failed at P, T = ', P, T
+          print*, err
+          stop 1
+        endif
+
+        if (size(cea%molfracs_species) /= size(species)) then
+          print*, 'Sonora test returned the wrong number of species.'
+          print*, 'P, T = ', P, T
+          stop 1
+        endif
+        if (size(cea%molfracs_species_gas) /= size(cea%gas_names)) then
+          print*, 'Sonora test returned the wrong number of gas species.'
+          print*, 'P, T = ', P, T
+          stop 1
+        endif
+        if (size(cea%molfracs_species_condensate) /= size(cea%condensate_names)) then
+          print*, 'Sonora test returned the wrong number of condensates.'
+          print*, 'P, T = ', P, T
+          stop 1
+        endif
+        if (any(.not.(cea%molfracs_species >= 0.0_dp))) then
+          print*, 'Sonora test produced negative species mole fractions.'
+          print*, 'P, T = ', P, T
+          stop 1
+        endif
+      enddo
+    enddo
+
+    print*, 'test_sonora passed.'
   end subroutine
 
   subroutine test_memory()
