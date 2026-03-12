@@ -232,12 +232,87 @@ def to_dict(atoms: List[Tuple[str, float]], species: List[Dict], output: pathlib
     return content
 
 
+def nasa9_cp_over_r(coeffs: Sequence[float], temperature: float) -> float:
+    """Dimensionless Cp/R from NASA9 coefficients at a temperature."""
+    a1, a2, a3, a4, a5, a6, a7, _, _ = coeffs
+    t = temperature
+    return a1 / (t * t) + a2 / t + a3 + a4 * t + a5 * t * t + a6 * t**3 + a7 * t**4
+
+
+def sample_temperatures(t_low: float, t_high: float, n_samples: int = 32) -> List[float]:
+    """Log-space samples including interval endpoints."""
+    if t_high <= t_low:
+        return [t_low]
+    if t_low <= 0.0:
+        step = (t_high - t_low) / (n_samples - 1)
+        return [t_low + i * step for i in range(n_samples)]
+    log_low = math.log(t_low)
+    log_high = math.log(t_high)
+    return [math.exp(log_low + i * (log_high - log_low) / (n_samples - 1)) for i in range(n_samples)]
+
+
+def species_has_unphysical_cp(
+    sp: Dict, cp_fix_tmin: float | None = None, cp_fix_tmax: float | None = None
+) -> bool:
+    """Return True if a species has non-positive or non-finite Cp in the requested T window."""
+    temp_ranges = sp["thermo"]["temperature-ranges"]
+    blocks = sp["thermo"]["data"]
+
+    t_window_low = cp_fix_tmin if cp_fix_tmin is not None else temp_ranges[0]
+    t_window_high = cp_fix_tmax if cp_fix_tmax is not None else temp_ranges[-1]
+    if t_window_high <= t_window_low:
+        raise ValueError("cp_fix_tmax must be greater than cp_fix_tmin")
+
+    for i, coeffs in enumerate(blocks):
+        t_low = max(temp_ranges[i], t_window_low)
+        t_high = min(temp_ranges[i + 1], t_window_high)
+        if t_high <= t_low:
+            continue
+        for t in sample_temperatures(t_low, t_high):
+            cp_r = nasa9_cp_over_r(coeffs, t)
+            if not math.isfinite(cp_r) or cp_r <= 0.0:
+                return True
+    return False
+
+
+def dof_cp_over_r(composition: Dict[str, float]) -> float:
+    """
+    Simple ideal-gas equipartition fallback Cp/R.
+
+    Monatomic: 2.5, Diatomic: 3.5, Polyatomic: 4.0 (rotational DoF active).
+    """
+    n_atoms = 0.0
+    for atom, count in composition.items():
+        if atom == "E":
+            continue
+        n_atoms += float(count)
+    n_atoms = int(round(n_atoms))
+
+    if n_atoms <= 1:
+        return 2.5
+    if n_atoms == 2:
+        return 3.5
+    return 4.0
+
+
+def replace_species_cp_with_dof(sp: Dict) -> None:
+    """Replace all NASA9 blocks with constant-Cp fallback based on composition DoF."""
+    cp_r = dof_cp_over_r(sp["composition"])
+    n_blocks = len(sp["thermo"]["data"])
+    sp["thermo"]["data"] = [[0.0, 0.0, cp_r, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] for _ in range(n_blocks)]
+
+
 def convert_file(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
     species: Sequence[str] | None = None,
     normalize_species_case: bool = False,
     dedupe_names: bool = False,
+    cp_fix_mode: str | None = None,
+    cp_fix_tmin: float | None = None,
+    cp_fix_tmax: float | None = None,
+    thermo_tmin_override: float | None = None,
+    thermo_tmax_override: float | None = None,
 ) -> None:
     raw_lines = input_path.read_text().splitlines()
     species_list: List[Dict] = []
@@ -335,6 +410,43 @@ def convert_file(
                 + ", ".join(missing_species)
             )
 
+    if thermo_tmin_override is not None:
+        for sp in species_list:
+            temp_ranges = sp["thermo"]["temperature-ranges"]
+            if thermo_tmin_override >= temp_ranges[1]:
+                raise ValueError(
+                    f"thermo_tmin_override={thermo_tmin_override} must be less than the "
+                    f"second temperature bound ({temp_ranges[1]}) for species '{sp['name']}'."
+                )
+            temp_ranges[0] = float(thermo_tmin_override)
+
+    if thermo_tmax_override is not None:
+        for sp in species_list:
+            temp_ranges = sp["thermo"]["temperature-ranges"]
+            if thermo_tmax_override <= temp_ranges[-2]:
+                raise ValueError(
+                    f"thermo_tmax_override={thermo_tmax_override} must be greater than the "
+                    f"second-to-last temperature bound ({temp_ranges[-2]}) for species "
+                    f"'{sp['name']}'."
+                )
+            temp_ranges[-1] = float(thermo_tmax_override)
+
+    if thermo_tmin_override is not None and thermo_tmax_override is not None:
+        for sp in species_list:
+            temp_ranges = sp["thermo"]["temperature-ranges"]
+            if temp_ranges[0] >= temp_ranges[-1]:
+                raise ValueError(
+                    f"thermo_tmin_override ({temp_ranges[0]}) must be less than "
+                    f"thermo_tmax_override ({temp_ranges[-1]}) for species '{sp['name']}'."
+                )
+
+    if cp_fix_mode is not None:
+        if cp_fix_mode != "dof":
+            raise ValueError(f"Unsupported cp_fix_mode '{cp_fix_mode}'. Supported: dof")
+        for sp in species_list:
+            if species_has_unphysical_cp(sp, cp_fix_tmin=cp_fix_tmin, cp_fix_tmax=cp_fix_tmax):
+                replace_species_cp_with_dof(sp)
+
     if "E" not in atom_masses:
         atom_masses["E"] = ELECTRON_MASS
     atoms_seen.setdefault("E", None)
@@ -380,6 +492,31 @@ def main() -> None:
         nargs="+",
         help="Optional list of species names to include; errors if any are missing",
     )
+    parser.add_argument(
+        "--cp-fix-mode",
+        choices=["dof"],
+        help="Optional Cp fix mode for unphysical species (climate-only output).",
+    )
+    parser.add_argument(
+        "--cp-fix-tmin",
+        type=float,
+        help="Lower temperature bound for Cp physicality checks (default: species range minimum).",
+    )
+    parser.add_argument(
+        "--cp-fix-tmax",
+        type=float,
+        help="Upper temperature bound for Cp physicality checks (default: species range maximum).",
+    )
+    parser.add_argument(
+        "--thermo-tmin-override",
+        type=float,
+        help="Override the lowest temperature bound for all species thermo polynomials.",
+    )
+    parser.add_argument(
+        "--thermo-tmax-override",
+        type=float,
+        help="Override the highest temperature bound for all species thermo polynomials.",
+    )
     args = parser.parse_args()
 
     input_path = args.input
@@ -391,6 +528,11 @@ def main() -> None:
         species=args.species,
         normalize_species_case=args.normalize_species_case,
         dedupe_names=args.dedupe_names,
+        cp_fix_mode=args.cp_fix_mode,
+        cp_fix_tmin=args.cp_fix_tmin,
+        cp_fix_tmax=args.cp_fix_tmax,
+        thermo_tmin_override=args.thermo_tmin_override,
+        thermo_tmax_override=args.thermo_tmax_override,
     )
     print(f"Wrote YAML to {output_path}")
 
