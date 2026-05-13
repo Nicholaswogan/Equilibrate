@@ -550,7 +550,7 @@ contains
 
   end subroutine
 
-  !> coppied from fortran stdlib v0.2.0
+  !> copied from fortran stdlib v0.2.0
   elemental function is_close(a, b, tol, abs_tol, equal_nan) result(close)
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     real(dp), intent(in) :: a, b
