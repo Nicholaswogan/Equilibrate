@@ -183,7 +183,7 @@ def set_easychem_atoms(exo, feh, co_factor):
     # feh = 0.00  # metallicity value in dex (i.e. +1.0 = 10x solar)
     # co_factor = 1.0 # C/O ratio **relative to solar** (i.e. 1 = solar ratio)
 
-    # note - the filname output will include the *actual* C/O ratio of the run
+    # note - the filename output will include the *actual* C/O ratio of the run
     # for example co_factor = 1.0 will give co0.55 in filename for Lo20 abunds
 
     #******************************************************************
